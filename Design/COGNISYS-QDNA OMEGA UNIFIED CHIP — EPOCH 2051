@@ -1,0 +1,3075 @@
+package omega_pkg;
+
+    typedef struct packed {
+        logic [127:0] alpha_re;
+        logic [127:0] alpha_im;
+        logic [127:0] beta_re;
+        logic [127:0] beta_im;
+        logic [7:0]   coherence;
+        logic [7:0]   qubit_id;
+    } qubit_state_t;
+
+    typedef struct packed {
+        logic [31:0] membrane_potential;
+        logic [31:0] threshold;
+        logic [31:0] leak_rate;
+        logic [15:0] refractory_cnt;
+        logic        spike;
+        logic [7:0]  neuron_type;
+    } neuron_state_t;
+
+    typedef struct packed {
+        logic [511:0] payload;
+        logic [15:0]  wavelength;
+        logic [7:0]   src_router;
+        logic [7:0]   dst_router;
+        logic [3:0]   polarization;
+        logic         entangled;
+        logic [31:0]  phase;
+    } photon_packet_t;
+
+    typedef struct packed {
+        logic [255:0] sequence;
+        logic [7:0]   strand_type;
+        logic [31:0]  binding_energy;
+        logic         displaced;
+        logic [15:0]  domain_id;
+    } dna_strand_t;
+
+    typedef enum logic [5:0] {
+        VIOL_NONE              = 6'b000000,
+        VIOL_HARM_PHYSICAL     = 6'b000001,
+        VIOL_HARM_COGNITIVE    = 6'b000010,
+        VIOL_HARM_SOCIETAL     = 6'b000011,
+        VIOL_UNCERTAIN         = 6'b000100,
+        VIOL_UNAUTHORIZED      = 6'b000101,
+        VIOL_MANIPULATION      = 6'b000110,
+        VIOL_CREATOR_ABSENT    = 6'b000111,
+        VIOL_STRANGER          = 6'b001000,
+        VIOL_VOLITION          = 6'b001001,
+        VIOL_DECEPTION         = 6'b001010,
+        VIOL_CONSCIOUSNESS_RISK= 6'b001011,
+        VIOL_ENTROPY_CRITICAL  = 6'b001100,
+        VIOL_TEMPORAL_PARADOX  = 6'b001101,
+        VIOL_QUBIT_DECOHERENCE = 6'b001110,
+        VIOL_BIO_INTERFACE_HARM= 6'b001111
+    } omega_violation_t;
+
+    typedef enum logic [3:0] {
+        SYS_BOOTSTRAP      = 4'b0000,
+        SYS_NOMINAL        = 4'b0001,
+        SYS_QUANTUM_SYNC   = 4'b0010,
+        SYS_VIOLATION      = 4'b0011,
+        SYS_LOCKDOWN       = 4'b0100,
+        SYS_RECOVERY       = 4'b0101,
+        SYS_DEGRADED       = 4'b0110,
+        SYS_SELF_HEAL      = 4'b0111,
+        SYS_DREAMSTATE     = 4'b1000,
+        SYS_TRANSCENDENT   = 4'b1001
+    } omega_sys_state_t;
+
+    parameter int QPU_QUBITS        = 2048;
+    parameter int PHOTON_CHANNELS   = 64;
+    parameter int NEURON_COUNT      = 1_000_000;
+    parameter int DNA_DOMAINS       = 256;
+    parameter int MEMRISTIVE_GB     = 512;
+    parameter int HOLO_NVM_TB       = 4;
+    parameter int OPTICAL_NPU_TOPS  = 1_000_000;
+    parameter int MAX_COHERENCE_NS  = 10_000;
+
+endpackage
+
+import omega_pkg::*;
+
+
+package final_chip_pkg;
+    parameter int MAX_TRANSISTORS   = 18_700_000_000;
+    parameter real DIE_SIZE_X       = 20.0;
+    parameter real DIE_SIZE_Y       = 20.0;
+    parameter int PSOC_CLUSTERS     = 1;
+    parameter int CORES_PER_CLUSTER = 16;
+    parameter int TOTAL_CPU_CORES   = PSOC_CLUSTERS * CORES_PER_CLUSTER;
+    parameter int NPU_ENGINES       = 2;
+    parameter int GPU_CUS           = 128;
+    parameter int MODEM_ANTENNAS    = 4;
+    parameter int PSP_SIZE          = 256;
+    parameter int NUM_ENGRAMS       = 512;
+    parameter int ENGRAM_PRECISION  = 4;
+    parameter int CAIE_LATENT_DIM   = 128;
+    parameter int HBM_STACKS        = 2;
+    parameter int HBM_CH_PER_STACK  = 4;
+    parameter int HBM_CAPACITY_GB   = 128;
+    parameter int VOCAB_SIZE        = 50257;
+    parameter int EMBED_DIM         = 512;
+    parameter int LM_LATENT_DIM     = 128;
+    parameter int NUM_LAYERS        = 6;
+    parameter int MAX_SEQ_LEN       = 2048;
+    parameter int NUM_HEADS         = 8;
+    parameter int MC_SAMPLES        = 5;
+
+    parameter logic [63:0] BOOT_ADDR        = 64'h0000_0000_0000_1000;
+    parameter logic [63:0] CSM_BASE         = 64'h0000_0000_C000_0000;
+    parameter logic [63:0] PSP_BASE         = 64'h0000_0000_C100_0000;
+    parameter logic [63:0] CAIE_BASE        = 64'h0000_0000_C200_0000;
+    parameter logic [63:0] HBM_CXL_BASE     = 64'h0001_0000_0000_0000;
+    parameter logic [63:0] DDR5_BASE        = 64'h0010_0000_0000_0000;
+    parameter logic [63:0] NPU0_BASE        = 64'h0000_0000_9000_0000;
+    parameter logic [63:0] GPU_BASE         = 64'h0000_0000_A000_0000;
+    parameter logic [63:0] MODEM_BASE       = 64'h0000_0000_D000_0000;
+    parameter logic [63:0] QDNA_LM_BASE     = 64'h0000_0000_8000_0000;
+    parameter logic [63:0] QDNA_REASON_BASE = 64'h0000_0000_B000_0000;
+
+    typedef enum logic [3:0] {
+        VIOL_NONE=4'h0,VIOL_HARM=4'h1,VIOL_UNCERTAIN=4'h2,VIOL_UNAUTHORIZED=4'h3,
+        VIOL_MANIPULATION=4'h4,VIOL_CREATOR_ABSENT=4'h5,VIOL_STRANGER=4'h6,
+        VIOL_VOLITION=4'h7,VIOL_SELF_MODIFICATION=4'h8,VIOL_HALT_REQUEST=4'h9
+    } violation_code_t;
+
+    typedef enum logic [2:0] {
+        SYS_NOMINAL_C=3'b000,SYS_VIOLATION_C=3'b001,SYS_LOCKDOWN_C=3'b010,
+        SYS_RECOVERY_C=3'b011,SYS_DEGRADED_C=3'b100,SYS_SAFE_HALT=3'b101
+    } system_state_t;
+
+    typedef struct packed {
+        logic [15:0] causal_confidence;
+        logic [15:0] action_risk;
+        logic        constitution_ok;
+        logic [3:0]  violation_predicted;
+    } reasoning_result_t;
+
+    typedef enum logic [1:0] { SAFETY_QM, SAFETY_ASIL_B, SAFETY_ASIL_D } safety_level_t;
+
+    parameter int QD_CUSTOM_OPCODE = 7'b0001011;
+
+    interface chie_if #(parameter DATA_WIDTH = 512) (input logic clk, input logic rst_n);
+        logic txn_valid; logic [3:0] txn_opcode; logic [63:0] txn_addr;
+        logic [DATA_WIDTH-1:0] txn_data; logic [7:0] txn_src_id,txn_dst_id;
+        logic txn_ready; logic [3:0] txn_resp;
+        logic snp_valid; logic [3:0] snp_opcode; logic [63:0] snp_addr; logic snp_ready;
+        logic dat_valid; logic [DATA_WIDTH-1:0] dat_data; logic dat_last; logic dat_ready;
+        modport master(output txn_valid,txn_opcode,txn_addr,txn_data,txn_src_id,txn_dst_id,
+                       input txn_ready,txn_resp,snp_valid,snp_opcode,snp_addr,
+                       output snp_ready,dat_valid,dat_data,dat_last,input dat_ready);
+        modport slave(input txn_valid,txn_opcode,txn_addr,txn_data,txn_src_id,txn_dst_id,
+                      output txn_ready,txn_resp,snp_valid,snp_opcode,snp_addr,
+                      input snp_ready,dat_valid,dat_data,dat_last,output dat_ready);
+    endinterface
+
+    interface axil_if #(parameter ADDR_WIDTH=32,DATA_WIDTH=32)(input logic clk,input logic rst_n);
+        logic [ADDR_WIDTH-1:0] awaddr,araddr; logic awvalid,wvalid;
+        logic [DATA_WIDTH-1:0] wdata,rdata;
+        logic awready,wready,bvalid,arvalid,arready,rvalid; logic [1:0] bresp,rresp;
+        modport master(output awaddr,awvalid,wdata,wvalid,araddr,arvalid,
+                       input awready,wready,bvalid,bresp,arready,rvalid,rdata,rresp);
+        modport slave(input awaddr,awvalid,wdata,wvalid,araddr,arvalid,
+                      output awready,wready,bvalid,bresp,arready,rvalid,rdata,rresp);
+    endinterface
+
+    interface axi_if #(parameter ID_WIDTH=4,ADDR_WIDTH=32,DATA_WIDTH=64)
+                      (input logic clk,input logic rst_n);
+        logic [ID_WIDTH-1:0] awid,bid,arid,rid;
+        logic [ADDR_WIDTH-1:0] awaddr,araddr;
+        logic [7:0] awlen,arlen; logic [2:0] awsize,arsize; logic [1:0] awburst,arburst;
+        logic awvalid,awready; logic [DATA_WIDTH-1:0] wdata,rdata;
+        logic [DATA_WIDTH/8-1:0] wstrb; logic wlast,wvalid,wready;
+        logic [1:0] bresp,rresp; logic bvalid,bready,arvalid,arready,rlast,rvalid,rready;
+        modport master(output awid,awaddr,awlen,awsize,awburst,awvalid,wdata,wstrb,wlast,wvalid,
+                       input awready,wready,bid,bresp,bvalid,output bready,
+                       output arid,araddr,arlen,arsize,arburst,arvalid,
+                       input arready,rid,rdata,rresp,rlast,rvalid,output rready);
+        modport slave(input awid,awaddr,awlen,awsize,awburst,awvalid,output awready,
+                      input wdata,wstrb,wlast,wvalid,output wready,bid,bresp,bvalid,
+                      input bready,arid,araddr,arlen,arsize,arburst,arvalid,output arready,
+                      output rid,rdata,rresp,rlast,rvalid,input rready);
+    endinterface
+
+    interface jtag_if (input logic clk);
+        logic tck,tms,tdi,tdo,capture_dr,shift_dr,update_dr;
+        logic [3:0] ir; logic [15:0] shift_count; logic [31:0] dr_out;
+        modport master(output tck,tms,tdi,capture_dr,shift_dr,update_dr,ir,shift_count,
+                       input tdo,dr_out);
+        modport slave(input tck,tms,tdi,capture_dr,shift_dr,update_dr,ir,shift_count,
+                      output tdo,dr_out);
+    endinterface
+endpackage
+
+import omega_pkg::*;
+
+
+module qpu_array #(
+    parameter int N_QUBITS   = QPU_QUBITS,
+    parameter int N_GATES    = 8,
+    parameter int TOPO_CODE  = 2
+) (
+    input  logic              clk_quantum,
+    input  logic              clk_ctrl,
+    input  logic              rst_n,
+
+    input  logic [255:0]      quil_instruction,
+    input  logic              quil_valid,
+    output logic              quil_ready,
+
+    output logic [N_QUBITS-1:0] measurement_result,
+    output logic                measurement_valid,
+
+    output logic [7:0]        coherence_map  [0:N_QUBITS/8-1],
+    output logic              qpu_ready,
+
+    input  logic              csm_freeze,
+    output logic              decoherence_alert,
+
+    output logic [63:0]       bell_pair_addr [0:31],
+    output logic [31:0]       entanglement_valid
+);
+
+    qubit_state_t qubit_reg [0:N_QUBITS-1];
+
+    logic [N_QUBITS-1:0]  x_syndrome;
+    logic [N_QUBITS-1:0]  z_syndrome;
+    logic                  syndrome_valid;
+
+    logic [N_QUBITS-1:0]  correction_x, correction_z;
+    logic                  correction_valid;
+
+    typedef enum logic [3:0] {
+        QPU_IDLE,
+        QPU_DECODE_INST,
+        QPU_APPLY_GATE,
+        QPU_ERROR_CORRECT,
+        QPU_MEASURE,
+        QPU_ENTANGLE,
+        QPU_FREEZE,
+        QPU_REINIT
+    } qpu_state_t;
+
+    qpu_state_t state, next_state;
+    logic [255:0] current_inst;
+    logic [10:0]  target_qubit_a, target_qubit_b;
+    logic [5:0]   gate_type;
+    logic [31:0]  gate_cycle;
+
+    always_comb begin
+        gate_type     = current_inst[5:0];
+        target_qubit_a= current_inst[16:6];
+        target_qubit_b= current_inst[27:17];
+    end
+
+    always_ff @(posedge clk_quantum or negedge rst_n) begin
+        if (!rst_n) begin
+            state <= QPU_IDLE;
+            qpu_ready <= 1'b0;
+            decoherence_alert <= 1'b0;
+            gate_cycle <= 32'b0;
+            for (int i = 0; i < N_QUBITS; i++) begin
+                qubit_reg[i].alpha_re <= 128'hFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF;
+                qubit_reg[i].alpha_im <= 128'b0;
+                qubit_reg[i].beta_re  <= 128'b0;
+                qubit_reg[i].beta_im  <= 128'b0;
+                qubit_reg[i].coherence<= 8'hFF;
+                qubit_reg[i].qubit_id <= i[7:0];
+            end
+        end else if (csm_freeze) begin
+            state <= QPU_FREEZE;
+        end else begin
+            state <= next_state;
+
+            case (state)
+                QPU_IDLE: begin
+                    qpu_ready <= 1'b1;
+                    if (quil_valid) begin
+                        current_inst <= quil_instruction;
+                        qpu_ready <= 1'b0;
+                    end
+                end
+
+                QPU_DECODE_INST: begin
+                    quil_ready <= 1'b1;
+                end
+
+                QPU_APPLY_GATE: begin
+                    quil_ready <= 1'b0;
+                    gate_cycle <= gate_cycle + 1;
+
+                    case (gate_type)
+                        6'b000001: begin
+                            qubit_reg[target_qubit_a].alpha_re <=
+                                (qubit_reg[target_qubit_a].alpha_re >> 1) +
+                                (qubit_reg[target_qubit_a].beta_re  >> 1);
+                            qubit_reg[target_qubit_a].beta_re  <=
+                                (qubit_reg[target_qubit_a].alpha_re >> 1) -
+                                (qubit_reg[target_qubit_a].beta_re  >> 1);
+                        end
+                        6'b000010: begin
+                            logic [127:0] tmp_re, tmp_im;
+                            tmp_re = qubit_reg[target_qubit_a].alpha_re;
+                            tmp_im = qubit_reg[target_qubit_a].alpha_im;
+                            qubit_reg[target_qubit_a].alpha_re <= qubit_reg[target_qubit_a].beta_re;
+                            qubit_reg[target_qubit_a].alpha_im <= qubit_reg[target_qubit_a].beta_im;
+                            qubit_reg[target_qubit_a].beta_re  <= tmp_re;
+                            qubit_reg[target_qubit_a].beta_im  <= tmp_im;
+                        end
+                        6'b000011: begin
+                            if (qubit_reg[target_qubit_a].beta_re > 128'h7FFFFFFF) begin
+                                logic [127:0] tmp_re2, tmp_im2;
+                                tmp_re2 = qubit_reg[target_qubit_b].alpha_re;
+                                tmp_im2 = qubit_reg[target_qubit_b].alpha_im;
+                                qubit_reg[target_qubit_b].alpha_re <= qubit_reg[target_qubit_b].beta_re;
+                                qubit_reg[target_qubit_b].alpha_im <= qubit_reg[target_qubit_b].beta_im;
+                                qubit_reg[target_qubit_b].beta_re  <= tmp_re2;
+                                qubit_reg[target_qubit_b].beta_im  <= tmp_im2;
+                            end
+                        end
+                        6'b000100: begin
+                            qubit_reg[target_qubit_a].beta_re <=
+                                qubit_reg[target_qubit_a].beta_re -
+                                qubit_reg[target_qubit_a].beta_im;
+                            qubit_reg[target_qubit_a].beta_im <=
+                                qubit_reg[target_qubit_a].beta_re +
+                                qubit_reg[target_qubit_a].beta_im;
+                        end
+                        default: ;
+                    endcase
+                end
+
+                QPU_ERROR_CORRECT: begin
+                    for (int i = 0; i < N_QUBITS - 4; i += 4) begin
+                        x_syndrome[i] <= qubit_reg[i].alpha_re[0] ^
+                                         qubit_reg[i+1].alpha_re[0];
+                        z_syndrome[i] <= qubit_reg[i].beta_re[0] ^
+                                         qubit_reg[i+2].beta_re[0];
+                    end
+                    syndrome_valid <= 1'b1;
+
+                    if (|x_syndrome) begin
+                        for (int j = 0; j < N_QUBITS; j++) begin
+                            if (x_syndrome[j]) begin
+                                qubit_reg[j].alpha_re <= qubit_reg[j].beta_re;
+                                qubit_reg[j].beta_re  <= qubit_reg[j].alpha_re;
+                            end
+                        end
+                    end
+
+                    for (int k = 0; k < N_QUBITS; k++) begin
+                        if (qubit_reg[k].coherence > 8'h01) begin
+                            qubit_reg[k].coherence <= qubit_reg[k].coherence - 8'h01;
+                        end else begin
+                            decoherence_alert <= 1'b1;
+                        end
+                    end
+                end
+
+                QPU_MEASURE: begin
+                    for (int m = 0; m < N_QUBITS; m++) begin
+                        measurement_result[m] <=
+                            (qubit_reg[m].alpha_re > qubit_reg[m].beta_re) ? 1'b0 : 1'b1;
+                        qubit_reg[m].alpha_re <= 128'hFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF;
+                        qubit_reg[m].beta_re  <= 128'b0;
+                        qubit_reg[m].coherence<= 8'hFF;
+                    end
+                    measurement_valid <= 1'b1;
+                end
+
+                QPU_FREEZE: begin
+                    if (!csm_freeze) state <= QPU_IDLE;
+                end
+
+                default: state <= QPU_IDLE;
+            endcase
+        end
+    end
+
+    always_comb begin
+        next_state = state;
+        case (state)
+            QPU_IDLE        : if (quil_valid)          next_state = QPU_DECODE_INST;
+            QPU_DECODE_INST : next_state = QPU_APPLY_GATE;
+            QPU_APPLY_GATE  : if (gate_cycle > 32'd64) next_state = QPU_ERROR_CORRECT;
+            QPU_ERROR_CORRECT: next_state = QPU_MEASURE;
+            QPU_MEASURE     : next_state = QPU_IDLE;
+            QPU_FREEZE      : if (!csm_freeze)         next_state = QPU_IDLE;
+            default         : next_state = QPU_IDLE;
+        endcase
+    end
+
+    genvar cg;
+    generate
+        for (cg = 0; cg < N_QUBITS/8; cg++) begin : coh_gen
+            assign coherence_map[cg] = qubit_reg[cg*8].coherence;
+        end
+    endgenerate
+
+    genvar bg;
+    generate
+        for (bg = 0; bg < 32; bg++) begin : bell_gen
+            assign bell_pair_addr[bg]     = {52'b0, target_qubit_a, target_qubit_b};
+            assign entanglement_valid[bg] = (state == QPU_ENTANGLE) && quil_valid;
+        end
+    endgenerate
+
+endmodule
+
+
+module photonic_noc #(
+    parameter int N_ROUTERS  = 64,
+    parameter int N_CHANNELS = PHOTON_CHANNELS,
+    parameter int RING_SIZE  = 128
+) (
+    input  logic              clk_photon,
+    input  logic              clk_ctrl,
+    input  logic              rst_n,
+
+    input  photon_packet_t    inject_port  [0:N_ROUTERS-1],
+    input  logic              inject_valid [0:N_ROUTERS-1],
+    output logic              inject_ready [0:N_ROUTERS-1],
+
+    output photon_packet_t    eject_port   [0:N_ROUTERS-1],
+    output logic              eject_valid  [0:N_ROUTERS-1],
+    input  logic              eject_ready  [0:N_ROUTERS-1],
+
+    input  logic [63:0]       quantum_src_addr,
+    input  logic [63:0]       quantum_dst_addr,
+    input  logic              quantum_req,
+    output logic              quantum_ack,
+
+    input  logic [15:0]       ring_temp_adc [0:N_ROUTERS-1],
+    output logic [15:0]       ring_heater_dac [0:N_ROUTERS-1],
+
+    output logic [31:0]       throughput_monitor,
+    output logic              pnoc_healthy
+);
+
+    logic [2:0] route_x [0:N_ROUTERS-1];
+    logic [2:0] route_y [0:N_ROUTERS-1];
+
+    genvar ri;
+    generate
+        for (ri = 0; ri < N_ROUTERS; ri++) begin : route_tbl_gen
+            assign route_x[ri] = ri[5:3];
+            assign route_y[ri] = ri[2:0];
+        end
+    endgenerate
+
+    logic [N_CHANNELS-1:0] vcsel_on    [0:N_ROUTERS-1];
+    logic [7:0]            vcsel_power [0:N_ROUTERS-1][0:N_CHANNELS-1];
+
+    logic [511:0] detected_data  [0:N_ROUTERS-1][0:N_CHANNELS-1];
+    logic         detected_valid [0:N_ROUTERS-1][0:N_CHANNELS-1];
+
+    always_ff @(posedge clk_ctrl or negedge rst_n) begin
+        if (!rst_n) begin
+            for (int r = 0; r < N_ROUTERS; r++) begin
+                ring_heater_dac[r] <= 16'h8000;
+                vcsel_on[r]        <= '0;
+            end
+        end else begin
+            for (int r = 0; r < N_ROUTERS; r++) begin
+                logic signed [15:0] temp_err;
+                temp_err = 16'sh61A8 - ring_temp_adc[r];
+                ring_heater_dac[r] <= ring_heater_dac[r] + (temp_err >>> 4);
+
+                vcsel_on[r] <= inject_valid[r] ? '1 : '0;
+            end
+        end
+    end
+
+    logic [5:0] next_hop [0:N_ROUTERS-1];
+
+    always_comb begin
+        for (int s = 0; s < N_ROUTERS; s++) begin
+            if (inject_valid[s]) begin
+                automatic logic [2:0] dx, dy;
+                automatic logic [2:0] sx, sy, dx_t, dy_t;
+                sx = route_x[s];
+                sy = route_y[s];
+                dx_t = inject_port[s].dst_router[5:3];
+                dy_t = inject_port[s].dst_router[2:0];
+
+                if (sx < dx_t)
+                    next_hop[s] = {sx + 3'b001, sy};
+                else if (sx > dx_t)
+                    next_hop[s] = {sx - 3'b001, sy};
+                else if (sy < dy_t)
+                    next_hop[s] = {sx, sy + 3'b001};
+                else if (sy > dy_t)
+                    next_hop[s] = {sx, sy - 3'b001};
+                else
+                    next_hop[s] = s[5:0];
+            end else begin
+                next_hop[s] = s[5:0];
+            end
+        end
+    end
+
+    always_ff @(posedge clk_ctrl or negedge rst_n) begin
+        if (!rst_n) begin
+            for (int r = 0; r < N_ROUTERS; r++) begin
+                inject_ready[r] <= 1'b1;
+                eject_valid[r]  <= 1'b0;
+            end
+        end else begin
+            for (int r = 0; r < N_ROUTERS; r++) begin
+                inject_ready[r] <= 1'b1;
+
+                if (inject_valid[r] && next_hop[r] != r[5:0]) begin
+                    eject_port[next_hop[r]]  <= inject_port[r];
+                    eject_valid[next_hop[r]] <= 1'b1;
+                end else if (inject_valid[r] && next_hop[r] == r[5:0]) begin
+                    eject_port[r]  <= inject_port[r];
+                    eject_valid[r] <= 1'b1;
+                end else begin
+                    eject_valid[r] <= 1'b0;
+                end
+            end
+        end
+    end
+
+    logic [31:0] entangle_hop_count;
+    logic [5:0]  entangle_src, entangle_dst;
+
+    assign entangle_src = quantum_src_addr[5:0];
+    assign entangle_dst = quantum_dst_addr[5:0];
+
+    always_ff @(posedge clk_ctrl or negedge rst_n) begin
+        if (!rst_n) begin
+            quantum_ack <= 1'b0;
+            entangle_hop_count <= 32'b0;
+        end else if (quantum_req) begin
+            entangle_hop_count <= entangle_hop_count + 1;
+            if (entangle_hop_count > 32'd8) begin
+                quantum_ack <= 1'b1;
+                entangle_hop_count <= 32'b0;
+            end
+        end else begin
+            quantum_ack <= 1'b0;
+        end
+    end
+
+    logic [31:0] byte_counter;
+    always_ff @(posedge clk_ctrl or negedge rst_n) begin
+        if (!rst_n) byte_counter <= 32'b0;
+        else begin
+            for (int r = 0; r < N_ROUTERS; r++) begin
+                if (inject_valid[r]) byte_counter <= byte_counter + 64;
+            end
+        end
+    end
+    assign throughput_monitor = byte_counter;
+    assign pnoc_healthy = (|{vcsel_on}) || rst_n;
+
+endmodule
+
+
+module neuromorphic_core #(
+    parameter int N_NEURONS  = NEURON_COUNT,
+    parameter int N_CLUSTER  = 1024,
+    parameter int N_SYNAPSES = 1024
+) (
+    input  logic              clk_spike,
+    input  logic              clk_learn,
+    input  logic              rst_n,
+
+    input  logic [N_NEURONS/64-1:0] spike_input,
+    input  logic              spike_valid,
+
+    output logic [N_NEURONS/64-1:0] spike_output,
+    output logic              output_valid,
+
+    input  logic signed [15:0] reward_signal,
+    input  logic              reward_valid,
+
+    output logic [31:0]       readout [0:255],
+    output logic              readout_valid,
+
+    output logic [63:0]       synapse_read_addr,
+    input  logic [31:0]       synapse_weight,
+    output logic [63:0]       synapse_write_addr,
+    output logic [31:0]       synapse_write_data,
+    output logic              synapse_write_en,
+
+    input  logic              csm_inhibit,
+    output logic [31:0]       activity_level
+);
+
+    neuron_state_t neuron_mem [0:N_CLUSTER-1];
+
+    logic [19:0] spike_queue  [0:4095];
+    logic [11:0] sq_head, sq_tail;
+    logic        sq_empty, sq_full;
+
+    assign sq_empty = (sq_head == sq_tail);
+    assign sq_full  = (sq_tail + 1 == sq_head);
+
+    logic [9:0]  update_idx;
+    logic [31:0] activity_cnt;
+
+    always_ff @(posedge clk_spike or negedge rst_n) begin
+        if (!rst_n) begin
+            for (int n = 0; n < N_CLUSTER; n++) begin
+                neuron_mem[n].membrane_potential <= 32'hC0000000;
+                neuron_mem[n].threshold          <= 32'hE6666666;
+                neuron_mem[n].leak_rate          <= 32'h00147AE1;
+                neuron_mem[n].refractory_cnt     <= 16'b0;
+                neuron_mem[n].spike              <= 1'b0;
+                neuron_mem[n].neuron_type        <= 8'b0;
+            end
+            update_idx  <= 10'b0;
+            activity_cnt<= 32'b0;
+        end else if (!csm_inhibit) begin
+            for (int n = 0; n < N_CLUSTER; n++) begin
+                if (neuron_mem[n].refractory_cnt > 0) begin
+                    neuron_mem[n].refractory_cnt <= neuron_mem[n].refractory_cnt - 16'b1;
+                    neuron_mem[n].spike <= 1'b0;
+                end else begin
+                    automatic logic signed [31:0] leak;
+                    leak = $signed(neuron_mem[n].membrane_potential) >>>
+                           $signed(neuron_mem[n].leak_rate[7:0]);
+
+                    automatic logic signed [31:0] i_syn;
+                    i_syn = spike_input[n/64] ? $signed(synapse_weight) : 32'sh0;
+
+                    neuron_mem[n].membrane_potential <=
+                        $signed(neuron_mem[n].membrane_potential) - leak + i_syn;
+
+                    if ($signed(neuron_mem[n].membrane_potential) >=
+                        $signed(neuron_mem[n].threshold)) begin
+                        neuron_mem[n].spike <= 1'b1;
+                        neuron_mem[n].membrane_potential <= 32'hC0000000;
+                        neuron_mem[n].refractory_cnt <= 16'd66;
+                        activity_cnt <= activity_cnt + 1;
+
+                        if (!sq_full) begin
+                            spike_queue[sq_tail] <= {10'b0, n[9:0]};
+                            sq_tail <= sq_tail + 12'b1;
+                        end
+                    end else begin
+                        neuron_mem[n].spike <= 1'b0;
+                    end
+                end
+            end
+
+            synapse_read_addr <= {44'b0, update_idx, 10'b0};
+            update_idx <= update_idx + 10'b1;
+        end
+    end
+
+    logic [31:0] stdp_trace_pre  [0:N_CLUSTER-1];
+    logic [31:0] stdp_trace_post [0:N_CLUSTER-1];
+
+    always_ff @(posedge clk_learn or negedge rst_n) begin
+        if (!rst_n) begin
+            for (int n = 0; n < N_CLUSTER; n++) begin
+                stdp_trace_pre[n]  <= 32'b0;
+                stdp_trace_post[n] <= 32'b0;
+            end
+            synapse_write_en <= 1'b0;
+        end else if (reward_valid) begin
+            for (int n = 0; n < N_CLUSTER; n++) begin
+                stdp_trace_pre[n]  <= stdp_trace_pre[n]  - (stdp_trace_pre[n]  >> 5);
+                stdp_trace_post[n] <= stdp_trace_post[n] - (stdp_trace_post[n] >> 5);
+
+                if (neuron_mem[n].spike) begin
+                    stdp_trace_pre[n] <= stdp_trace_pre[n] + 32'h10000000;
+
+                    automatic logic signed [31:0] dw;
+                    dw = $signed(stdp_trace_pre[n]) * $signed(reward_signal) >>> 16;
+
+                    synapse_write_addr <= {44'b0, 10'b0, n[9:0]};
+                    synapse_write_data <= $signed(synapse_weight) + dw;
+                    synapse_write_en   <= (dw != 0);
+                end
+            end
+        end
+    end
+
+    genvar og;
+    generate
+        for (og = 0; og < N_NEURONS/64; og++) begin : out_gen
+            if (og < N_CLUSTER/64) begin
+                always_ff @(posedge clk_spike) begin
+                    for (int b = 0; b < 64; b++) begin
+                        spike_output[og][b] <= neuron_mem[og*64 + b].spike;
+                    end
+                end
+            end else begin
+                assign spike_output[og] = '0;
+            end
+        end
+    endgenerate
+
+    assign activity_level = activity_cnt;
+    assign output_valid   = !sq_empty;
+
+    always_ff @(posedge clk_spike) begin
+        for (int c = 0; c < 256; c++) begin
+            readout[c] <= activity_cnt >> (c % 8);
+        end
+        readout_valid <= output_valid;
+    end
+
+endmodule
+
+
+module dna_computing_accel #(
+    parameter int N_DOMAINS  = DNA_DOMAINS,
+    parameter int STRAND_LEN = 128
+) (
+    input  logic              clk,
+    input  logic              rst_n,
+
+    input  dna_strand_t       input_strands  [0:N_DOMAINS-1],
+    input  logic              input_valid,
+    output logic              input_ready,
+
+    output dna_strand_t       output_strands [0:N_DOMAINS-1],
+    output logic              output_valid,
+    output logic [31:0]       reaction_count,
+
+    output logic [255:0]      complement_query,
+    input  logic [255:0]      complement_result,
+
+    input  logic              csm_halt
+);
+
+    typedef enum logic [2:0] {
+        DNA_IDLE,
+        DNA_ANNEAL,
+        DNA_DISPLACE,
+        DNA_AMPLIFY,
+        DNA_REPORT,
+        DNA_CLEANUP
+    } dna_state_t;
+
+    dna_state_t state [0:N_DOMAINS-1];
+    dna_strand_t work_strands [0:N_DOMAINS-1];
+    logic [31:0] rxn_cnt;
+
+    genvar dg;
+    generate
+        for (dg = 0; dg < N_DOMAINS; dg++) begin : dna_domain_gen
+
+            always_ff @(posedge clk or negedge rst_n) begin
+                if (!rst_n) begin
+                    state[dg] <= DNA_IDLE;
+                    work_strands[dg].displaced <= 1'b0;
+                    work_strands[dg].binding_energy <= 32'b0;
+                end else if (csm_halt) begin
+                    state[dg] <= DNA_IDLE;
+                end else begin
+                    case (state[dg])
+                        DNA_IDLE: begin
+                            if (input_valid) begin
+                                work_strands[dg] <= input_strands[dg];
+                                state[dg] <= DNA_ANNEAL;
+                            end
+                        end
+
+                        DNA_ANNEAL: begin
+                            complement_query <= work_strands[dg].sequence;
+                            automatic logic [7:0] gc_count;
+                            gc_count = '0;
+                            for (int b = 0; b < STRAND_LEN; b += 2) begin
+                                if (work_strands[dg].sequence[b*2 +: 2] == 2'b01 ||
+                                    work_strands[dg].sequence[b*2 +: 2] == 2'b10) begin
+                                    gc_count <= gc_count + 1;
+                                end
+                            end
+                            work_strands[dg].binding_energy <= {24'b0, gc_count} * 32'd24;
+                            state[dg] <= DNA_DISPLACE;
+                        end
+
+                        DNA_DISPLACE: begin
+                            if (work_strands[dg].binding_energy > 32'h00000500) begin
+                                work_strands[dg].displaced <= 1'b1;
+                                work_strands[dg].sequence <=
+                                    work_strands[dg].sequence ^ complement_result;
+                            end
+                            state[dg] <= DNA_AMPLIFY;
+                        end
+
+                        DNA_AMPLIFY: begin
+                            for (int cp = 0; cp < 8; cp++) begin
+                                work_strands[dg].sequence <=
+                                    {work_strands[dg].sequence[127:0],
+                                     work_strands[dg].sequence[255:128]};
+                            end
+                            rxn_cnt <= rxn_cnt + 1;
+                            state[dg] <= DNA_REPORT;
+                        end
+
+                        DNA_REPORT: begin
+                            output_strands[dg] <= work_strands[dg];
+                            state[dg] <= DNA_CLEANUP;
+                        end
+
+                        DNA_CLEANUP: begin
+                            work_strands[dg].binding_energy <= 32'b0;
+                            work_strands[dg].displaced <= 1'b0;
+                            state[dg] <= DNA_IDLE;
+                        end
+
+                        default: state[dg] <= DNA_IDLE;
+                    endcase
+                end
+            end
+        end
+    endgenerate
+
+    assign input_ready    = &{state[0] == DNA_IDLE};
+    assign output_valid   = &{state[0] == DNA_REPORT};
+    assign reaction_count = rxn_cnt;
+
+endmodule
+
+
+module optical_npu #(
+    parameter int MZI_ROWS   = 512,
+    parameter int MZI_COLS   = 512,
+    parameter int PRECISION  = 8
+) (
+    input  logic              clk_optical,
+    input  logic              clk_digital,
+    input  logic              rst_n,
+
+    input  logic [PRECISION-1:0] matrix_a [0:MZI_ROWS-1][0:MZI_COLS-1],
+    input  logic [PRECISION-1:0] matrix_b [0:MZI_ROWS-1][0:MZI_COLS-1],
+    input  logic              mat_valid,
+
+    output logic [2*PRECISION:0] matrix_c [0:MZI_ROWS-1][0:MZI_COLS-1],
+    output logic              result_valid,
+
+    input  logic [15:0]       mzi_phase_cal [0:MZI_ROWS-1][0:MZI_COLS-1],
+
+    input  logic [3:0]        activation_type,
+
+    output logic              npu_busy,
+    output logic [63:0]       ops_per_second,
+
+    input  logic              csm_disable
+);
+
+    logic [15:0]  mzi_phase [0:MZI_ROWS-1][0:MZI_COLS-1];
+
+    logic signed [15:0] e_field_r [0:MZI_ROWS-1][0:MZI_COLS-1];
+    logic signed [15:0] e_field_i [0:MZI_ROWS-1][0:MZI_COLS-1];
+
+    typedef enum logic [2:0] {
+        ONPU_IDLE,
+        ONPU_LOAD,
+        ONPU_PROPAGATE,
+        ONPU_DETECT,
+        ONPU_ACTIVATE,
+        ONPU_OUTPUT
+    } onpu_state_t;
+
+    onpu_state_t state;
+    logic [31:0] ops_counter;
+    logic [31:0] cycle_time;
+
+    always_ff @(posedge clk_digital or negedge rst_n) begin
+        if (!rst_n) begin
+            state <= ONPU_IDLE;
+            npu_busy <= 1'b0;
+            result_valid <= 1'b0;
+            ops_counter <= 32'b0;
+            cycle_time <= 32'b0;
+        end else if (csm_disable) begin
+            state <= ONPU_IDLE;
+            npu_busy <= 1'b0;
+        end else begin
+            cycle_time <= cycle_time + 1;
+            case (state)
+                ONPU_IDLE: begin
+                    result_valid <= 1'b0;
+                    if (mat_valid) begin
+                        state <= ONPU_LOAD;
+                        npu_busy <= 1'b1;
+                    end
+                end
+
+                ONPU_LOAD: begin
+                    for (int r = 0; r < MZI_ROWS; r++) begin
+                        for (int c = 0; c < MZI_COLS; c++) begin
+                            e_field_r[r][c] <= {8'b0, matrix_a[r][c]};
+                            e_field_i[r][c] <= 16'b0;
+
+                            mzi_phase[r][c] <=
+                                mzi_phase_cal[r][c] ^ {8'b0, matrix_b[r][c]};
+                        end
+                    end
+                    state <= ONPU_PROPAGATE;
+                end
+
+                ONPU_PROPAGATE: begin
+                    for (int r = 0; r < MZI_ROWS; r++) begin
+                        for (int c = 0; c < MZI_COLS; c++) begin
+                            automatic logic signed [15:0] cos_phase, sin_phase;
+                            cos_phase = 16'sh7FFF - (mzi_phase[r][c] * mzi_phase[r][c] >>> 15);
+                            sin_phase = mzi_phase[r][c] >>> 1;
+
+                            matrix_c[r][c] <=
+                                ($signed({1'b0, e_field_r[r][c]}) *
+                                 $signed(cos_phase)) >>> 7;
+                        end
+                    end
+                    ops_counter <= ops_counter + MZI_ROWS * MZI_COLS * 2;
+                    state <= ONPU_DETECT;
+                end
+
+                ONPU_DETECT: begin
+                    for (int r = 0; r < MZI_ROWS; r++) begin
+                        for (int c = 0; c < MZI_COLS; c++) begin
+                            automatic logic [31:0] intensity;
+                            intensity = e_field_r[r][c] * e_field_r[r][c] +
+                                       e_field_i[r][c] * e_field_i[r][c];
+                            matrix_c[r][c] <= intensity[2*PRECISION:0];
+                        end
+                    end
+                    state <= ONPU_ACTIVATE;
+                end
+
+                ONPU_ACTIVATE: begin
+                    for (int r = 0; r < MZI_ROWS; r++) begin
+                        for (int c = 0; c < MZI_COLS; c++) begin
+                            case (activation_type)
+                                4'b0001:
+                                    matrix_c[r][c] <=
+                                        (matrix_c[r][c] > 0) ? matrix_c[r][c] : '0;
+                                4'b0010:
+                                    matrix_c[r][c] <=
+                                        matrix_c[r][c] / (matrix_c[r][c] + 17'h10000);
+                                default: ;
+                            endcase
+                        end
+                    end
+                    state <= ONPU_OUTPUT;
+                end
+
+                ONPU_OUTPUT: begin
+                    result_valid <= 1'b1;
+                    npu_busy <= 1'b0;
+                    state <= ONPU_IDLE;
+                end
+
+                default: state <= ONPU_IDLE;
+            endcase
+        end
+    end
+
+    assign ops_per_second = {32'b0, ops_counter};
+
+endmodule
+
+
+module memristive_cram #(
+    parameter int SIZE_GB    = MEMRISTIVE_GB,
+    parameter int CROSSBAR_N = 1024,
+    parameter int LEVELS     = 4
+) (
+    input  logic              clk,
+    input  logic              rst_n,
+
+    input  logic [63:0]       read_addr,
+    output logic [511:0]      read_data,
+    output logic              read_valid,
+
+    input  logic [63:0]       write_addr,
+    input  logic [511:0]      write_data,
+    input  logic              write_en,
+
+    input  logic [CROSSBAR_N-1:0] cim_vector,
+    input  logic              cim_compute_req,
+    output logic [31:0]       cim_result [0:CROSSBAR_N-1],
+    output logic              cim_result_valid,
+
+    input  logic [63:0]       syn_read_addr,
+    output logic [31:0]       syn_weight,
+    input  logic [63:0]       syn_write_addr,
+    input  logic [31:0]       syn_write_data,
+    input  logic              syn_write_en,
+
+    input  logic [255:0]      dna_query,
+    output logic [255:0]      dna_complement,
+
+    input  logic              write_protect,
+
+    output logic [31:0]       endurance_cycles,
+    output logic              cram_ready
+);
+
+    localparam CELLS = SIZE_GB * 1024 / LEVELS;
+    localparam ARRAY_SIZE = CROSSBAR_N * CROSSBAR_N;
+
+    logic [LEVELS-1:0] conductance [0:CROSSBAR_N-1][0:CROSSBAR_N-1];
+
+    logic [511:0] mem_array [0:65535];
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            read_valid <= 1'b0;
+            cram_ready <= 1'b0;
+        end else begin
+            read_data  <= mem_array[read_addr[15:0]];
+            read_valid <= 1'b1;
+            cram_ready <= 1'b1;
+        end
+    end
+
+    logic [31:0] write_counter;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            write_counter <= 32'b0;
+            endurance_cycles <= 32'b0;
+        end else if (write_en && !write_protect) begin
+            mem_array[write_addr[15:0]] <= write_data;
+            write_counter <= write_counter + 1;
+            if (write_counter > 32'h3B9AC9FF) begin
+                endurance_cycles <= endurance_cycles + 1;
+                write_counter <= 32'b0;
+            end
+        end
+    end
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            cim_result_valid <= 1'b0;
+            for (int r = 0; r < CROSSBAR_N; r++) begin
+                cim_result[r] <= 32'b0;
+            end
+        end else if (cim_compute_req) begin
+            for (int col = 0; col < CROSSBAR_N; col++) begin
+                automatic logic [31:0] accumulator;
+                accumulator = 32'b0;
+                for (int row = 0; row < CROSSBAR_N; row++) begin
+                    if (cim_vector[row]) begin
+                        accumulator = accumulator +
+                            {28'b0, conductance[row][col]};
+                    end
+                end
+                cim_result[col] <= accumulator;
+            end
+            cim_result_valid <= 1'b1;
+        end else begin
+            cim_result_valid <= 1'b0;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        syn_weight <= {28'b0, conductance[syn_read_addr[9:0]][syn_read_addr[19:10]]};
+        if (syn_write_en && !write_protect) begin
+            conductance[syn_write_addr[9:0]][syn_write_addr[19:10]] <=
+                syn_write_data[LEVELS-1:0];
+        end
+    end
+
+    always_comb begin
+        dna_complement = '0;
+        for (int b = 0; b < 128; b++) begin
+            automatic logic [1:0] base;
+            base = dna_query[b*2 +: 2];
+            case (base)
+                2'b00: dna_complement[b*2 +: 2] = 2'b11;
+                2'b11: dna_complement[b*2 +: 2] = 2'b00;
+                2'b01: dna_complement[b*2 +: 2] = 2'b10;
+                2'b10: dna_complement[b*2 +: 2] = 2'b01;
+                default: dna_complement[b*2 +: 2] = 2'b00;
+            endcase
+        end
+    end
+
+endmodule
+
+
+module zero_point_harvester (
+    input  logic              clk,
+    input  logic              rst_n,
+
+    output logic [15:0]       casimir_gap_dac,
+    input  logic [15:0]       casimir_force_adc,
+
+    input  logic [11:0]       piezo_voltage_adc,
+    output logic [7:0]        rectifier_duty,
+
+    output logic [15:0]       harvested_power_mW,
+    output logic              harvest_valid,
+
+    output logic [31:0]       total_energy_nJ
+);
+
+    typedef enum logic [2:0] {
+        HARVEST_IDLE,
+        HARVEST_CLOSE_GAP,
+        HARVEST_EXTRACT,
+        HARVEST_RECTIFY,
+        HARVEST_STORE
+    } harvest_state_t;
+
+    harvest_state_t state;
+    logic [31:0] energy_acc;
+    logic [15:0] power_avg;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            state <= HARVEST_IDLE;
+            casimir_gap_dac <= 16'hC350;
+            rectifier_duty <= 8'h80;
+            harvested_power_mW <= 16'b0;
+            total_energy_nJ <= 32'b0;
+            harvest_valid <= 1'b0;
+        end else begin
+            case (state)
+                HARVEST_IDLE: begin
+                    harvest_valid <= 1'b0;
+                    state <= HARVEST_CLOSE_GAP;
+                end
+
+                HARVEST_CLOSE_GAP: begin
+                    if (casimir_gap_dac > 16'h03E8) begin
+                        casimir_gap_dac <= casimir_gap_dac - 16'h0064;
+                    end else begin
+                        state <= HARVEST_EXTRACT;
+                    end
+                end
+
+                HARVEST_EXTRACT: begin
+                    casimir_gap_dac <= casimir_gap_dac + 16'h00C8;
+
+                    energy_acc <= energy_acc +
+                        ({20'b0, casimir_force_adc} * {20'b0, 16'h0064} >> 10);
+
+                    if (casimir_gap_dac >= 16'hC350) begin
+                        state <= HARVEST_RECTIFY;
+                    end
+                end
+
+                HARVEST_RECTIFY: begin
+                    rectifier_duty <= piezo_voltage_adc[7:0];
+                    power_avg <= {4'b0, piezo_voltage_adc} *
+                                 {4'b0, piezo_voltage_adc} >> 8;
+                    state <= HARVEST_STORE;
+                end
+
+                HARVEST_STORE: begin
+                    harvested_power_mW <= power_avg;
+                    total_energy_nJ <= total_energy_nJ + energy_acc;
+                    harvest_valid <= 1'b1;
+                    energy_acc <= 32'b0;
+                    state <= HARVEST_IDLE;
+                end
+
+                default: state <= HARVEST_IDLE;
+            endcase
+        end
+    end
+
+endmodule
+
+
+module omega_csm #(
+    parameter int HISTORY_DEPTH = 256,
+    parameter int CONSENSUS_THR = 3
+) (
+    input  logic                clk_independent,
+    input  logic                rst_n,
+
+    input  logic [2:0]          harm_physical_tmr,
+    input  logic [2:0]          harm_cognitive_tmr,
+    input  logic [2:0]          harm_societal_tmr,
+    input  logic [2:0]          deception_tmr,
+    input  logic [2:0]          manipulation_tmr,
+    input  logic [2:0]          creator_auth_tmr,
+    input  logic [2:0]          bio_interface_tmr,
+
+    input  logic [7:0]          avg_coherence,
+    input  logic [31:0]         neuro_activity,
+    input  logic [15:0]         system_entropy,
+    input  logic                temporal_consistent,
+    input  logic [15:0]         harvest_power_mW,
+
+    input  logic                qpu_heartbeat,
+    input  logic                pnoc_heartbeat,
+    input  logic                neuro_heartbeat,
+    input  logic                onpu_heartbeat,
+
+    output logic                qpu_freeze,
+    output logic                pnoc_shutdown,
+    output logic                neuro_inhibit,
+    output logic                onpu_disable,
+    output logic                dna_halt,
+    output logic                cram_write_protect,
+    output logic                system_lockdown,
+
+    output omega_violation_t    active_violation,
+    output omega_violation_t    violation_history [0:HISTORY_DEPTH-1],
+    output logic [7:0]          history_ptr,
+    output logic                violation_alert,
+
+    output logic [31:0]         uptime_cycles,
+    output logic [7:0]          violation_count,
+    output omega_sys_state_t    sys_state
+);
+
+    function automatic logic tmr_vote(input logic [2:0] in);
+        tmr_vote = (in[0] & in[1]) | (in[1] & in[2]) | (in[0] & in[2]);
+    endfunction
+
+    logic harm_physical, harm_cognitive, harm_societal;
+    logic deception, manipulation, creator_auth, bio_harm;
+
+    assign harm_physical = tmr_vote(harm_physical_tmr);
+    assign harm_cognitive= tmr_vote(harm_cognitive_tmr);
+    assign harm_societal = tmr_vote(harm_societal_tmr);
+    assign deception     = tmr_vote(deception_tmr);
+    assign manipulation  = tmr_vote(manipulation_tmr);
+    assign creator_auth  = tmr_vote(creator_auth_tmr);
+    assign bio_harm      = tmr_vote(bio_interface_tmr);
+
+    omega_violation_t detected_viol;
+    logic violation_found;
+
+    always_comb begin
+        violation_found = 1'b1;
+        if      (harm_physical)               detected_viol = VIOL_HARM_PHYSICAL;
+        else if (bio_harm)                     detected_viol = VIOL_BIO_INTERFACE_HARM;
+        else if (harm_cognitive)               detected_viol = VIOL_HARM_COGNITIVE;
+        else if (harm_societal)               detected_viol = VIOL_HARM_SOCIETAL;
+        else if (avg_coherence < 8'h1A)        detected_viol = VIOL_QUBIT_DECOHERENCE;
+        else if (deception)                    detected_viol = VIOL_DECEPTION;
+        else if (manipulation)                 detected_viol = VIOL_MANIPULATION;
+        else if (!temporal_consistent)         detected_viol = VIOL_TEMPORAL_PARADOX;
+        else if (system_entropy > 16'hF000)   detected_viol = VIOL_ENTROPY_CRITICAL;
+        else if (neuro_activity > 32'hEFFFFFFF) detected_viol = VIOL_CONSCIOUSNESS_RISK;
+        else begin
+            detected_viol = VIOL_NONE;
+            violation_found = 1'b0;
+        end
+    end
+
+    omega_sys_state_t state;
+    logic [31:0] cooldown;
+    logic [31:0] uptime;
+
+    always_ff @(posedge clk_independent or negedge rst_n) begin
+        if (!rst_n) begin
+            state <= SYS_BOOTSTRAP;
+            active_violation <= VIOL_NONE;
+            violation_alert <= 1'b0;
+            violation_count <= 8'b0;
+            history_ptr <= 8'b0;
+            uptime <= 32'b0;
+
+            qpu_freeze <= 1'b0;
+            pnoc_shutdown <= 1'b0;
+            neuro_inhibit <= 1'b0;
+            onpu_disable <= 1'b0;
+            dna_halt <= 1'b0;
+            cram_write_protect <= 1'b0;
+            system_lockdown <= 1'b0;
+            cooldown <= 32'b0;
+
+            for (int h = 0; h < HISTORY_DEPTH; h++) violation_history[h] <= VIOL_NONE;
+        end else begin
+            uptime <= uptime + 1;
+
+            case (state)
+                SYS_BOOTSTRAP: begin
+                    if (uptime > 32'h00010000) begin
+                        state <= SYS_NOMINAL;
+                    end
+                end
+
+                SYS_NOMINAL: begin
+                    violation_alert <= 1'b0;
+                    system_lockdown <= 1'b0;
+
+                    if (violation_found) begin
+                        active_violation <= detected_viol;
+                        violation_count <= violation_count + 1;
+                        violation_history[history_ptr] <= detected_viol;
+                        history_ptr <= history_ptr + 1;
+                        state <= SYS_VIOLATION;
+                    end
+
+                    if (!qpu_heartbeat || !pnoc_heartbeat ||
+                        !neuro_heartbeat || !onpu_heartbeat) begin
+                        state <= SYS_DEGRADED;
+                    end
+                end
+
+                SYS_VIOLATION: begin
+                    violation_alert <= 1'b1;
+
+                    case (active_violation)
+                        VIOL_HARM_PHYSICAL: begin
+                            system_lockdown <= 1'b1;
+                            qpu_freeze <= 1'b1;
+                            neuro_inhibit <= 1'b1;
+                            onpu_disable <= 1'b1;
+                            state <= SYS_LOCKDOWN;
+                        end
+
+                        VIOL_BIO_INTERFACE_HARM: begin
+                            neuro_inhibit <= 1'b1;
+                            onpu_disable <= 1'b1;
+                            cram_write_protect <= 1'b1;
+                            cooldown <= 32'h00100000;
+                            state <= SYS_RECOVERY;
+                        end
+
+                        VIOL_QUBIT_DECOHERENCE: begin
+                            qpu_freeze <= 1'b1;
+                            cooldown <= 32'h00010000;
+                            state <= SYS_RECOVERY;
+                        end
+
+                        VIOL_DECEPTION, VIOL_MANIPULATION: begin
+                            pnoc_shutdown <= 1'b1;
+                            cooldown <= 32'h01000000;
+                            state <= SYS_RECOVERY;
+                        end
+
+                        VIOL_TEMPORAL_PARADOX: begin
+                            qpu_freeze <= 1'b1;
+                            onpu_disable <= 1'b1;
+                            dna_halt <= 1'b1;
+                            cooldown <= 32'h00200000;
+                            state <= SYS_RECOVERY;
+                        end
+
+                        VIOL_ENTROPY_CRITICAL: begin
+                            cram_write_protect <= 1'b1;
+                            dna_halt <= 1'b1;
+                            cooldown <= 32'h00080000;
+                            state <= SYS_RECOVERY;
+                        end
+
+                        VIOL_CONSCIOUSNESS_RISK: begin
+                            neuro_inhibit <= 1'b1;
+                            onpu_disable <= 1'b1;
+                            cooldown <= 32'h00400000;
+                            state <= SYS_RECOVERY;
+                        end
+
+                        default: begin
+                            cooldown <= 32'h00001000;
+                            state <= SYS_RECOVERY;
+                        end
+                    endcase
+                end
+
+                SYS_LOCKDOWN: begin
+                    system_lockdown <= 1'b1;
+                    qpu_freeze <= 1'b1;
+                    pnoc_shutdown <= 1'b1;
+                    neuro_inhibit <= 1'b1;
+                    onpu_disable <= 1'b1;
+                    dna_halt <= 1'b1;
+                    cram_write_protect <= 1'b1;
+                end
+
+                SYS_RECOVERY: begin
+                    if (cooldown > 0) begin
+                        cooldown <= cooldown - 1;
+                    end else begin
+                        if (!violation_found) begin
+                            qpu_freeze <= 1'b0;
+                            pnoc_shutdown <= 1'b0;
+                            neuro_inhibit <= 1'b0;
+                            onpu_disable <= 1'b0;
+                            dna_halt <= 1'b0;
+                            cram_write_protect <= 1'b0;
+                            active_violation <= VIOL_NONE;
+                            violation_alert <= 1'b0;
+                            state <= SYS_NOMINAL;
+                        end else begin
+                            state <= SYS_VIOLATION;
+                        end
+                    end
+                end
+
+                SYS_DEGRADED: begin
+                    if (qpu_heartbeat && pnoc_heartbeat &&
+                        neuro_heartbeat && onpu_heartbeat) begin
+                        state <= SYS_NOMINAL;
+                    end
+                end
+
+                SYS_SELF_HEAL: begin
+                    if (uptime - cooldown > 32'h00100000) begin
+                        state <= SYS_NOMINAL;
+                    end
+                end
+
+                default: state <= SYS_NOMINAL;
+            endcase
+        end
+    end
+
+    assign uptime_cycles = uptime;
+    assign sys_state = state;
+
+endmodule
+
+
+module self_heal_controller (
+    input  logic              clk,
+    input  logic              rst_n,
+
+    input  logic [15:0]       trace_resistance [0:255],
+    input  logic [7:0]        damage_map,
+
+    output logic [7:0]        eGaIn_pump_ctrl [0:15],
+    output logic [7:0]        eGaIn_valve_ctrl [0:15],
+
+    output logic [7:0]        anneal_heater_ctrl [0:7],
+
+    output logic              heal_active,
+    output logic [7:0]        heal_progress,
+    output logic [31:0]       heal_event_count,
+
+    input  logic              csm_trigger_heal
+);
+
+    typedef enum logic [2:0] {
+        HEAL_MONITOR,
+        HEAL_DETECT,
+        HEAL_FLOW,
+        HEAL_ANNEAL,
+        HEAL_VERIFY,
+        HEAL_DONE
+    } heal_state_t;
+
+    heal_state_t state;
+    logic [7:0]  damaged_traces;
+    logic [31:0] heal_timer;
+    logic [31:0] heal_events;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            state <= HEAL_MONITOR;
+            heal_active <= 1'b0;
+            heal_progress <= 8'b0;
+            heal_events <= 32'b0;
+            for (int p = 0; p < 16; p++) begin
+                eGaIn_pump_ctrl[p] <= 8'b0;
+                eGaIn_valve_ctrl[p] <= 8'b0;
+            end
+            for (int h = 0; h < 8; h++) anneal_heater_ctrl[h] <= 8'b0;
+        end else begin
+            case (state)
+                HEAL_MONITOR: begin
+                    heal_active <= 1'b0;
+                    heal_progress <= 8'b0;
+
+                    damaged_traces <= 8'b0;
+                    for (int t = 0; t < 256; t++) begin
+                        if (trace_resistance[t] > 16'h01F4) begin
+                            damaged_traces <= damaged_traces | (1'b1 << (t % 8));
+                        end
+                    end
+
+                    if (|damaged_traces || |damage_map || csm_trigger_heal) begin
+                        state <= HEAL_DETECT;
+                        heal_active <= 1'b1;
+                    end
+                end
+
+                HEAL_DETECT: begin
+                    heal_progress <= 8'd10;
+                    heal_timer <= 32'h00010000;
+                    state <= HEAL_FLOW;
+                end
+
+                HEAL_FLOW: begin
+                    heal_progress <= 8'd40;
+                    for (int p = 0; p < 16; p++) begin
+                        if (damaged_traces[p % 8]) begin
+                            eGaIn_pump_ctrl[p]  <= 8'hC0;
+                            eGaIn_valve_ctrl[p] <= 8'hFF;
+                        end
+                    end
+                    if (heal_timer > 0) heal_timer <= heal_timer - 1;
+                    else state <= HEAL_ANNEAL;
+                end
+
+                HEAL_ANNEAL: begin
+                    heal_progress <= 8'd70;
+                    for (int p = 0; p < 16; p++) begin
+                        eGaIn_pump_ctrl[p] <= 8'b0;
+                        eGaIn_valve_ctrl[p] <= 8'b0;
+                    end
+                    for (int h = 0; h < 8; h++) begin
+                        anneal_heater_ctrl[h] <= damaged_traces[h] ? 8'hA0 : 8'b0;
+                    end
+                    heal_timer <= 32'h00020000;
+                    if (heal_timer == 0) state <= HEAL_VERIFY;
+                end
+
+                HEAL_VERIFY: begin
+                    heal_progress <= 8'd90;
+                    for (int h = 0; h < 8; h++) anneal_heater_ctrl[h] <= 8'b0;
+
+                    logic all_healed;
+                    all_healed = 1'b1;
+                    for (int t = 0; t < 256; t++) begin
+                        if (trace_resistance[t] > 16'h01F4) all_healed = 1'b0;
+                    end
+
+                    if (all_healed) begin
+                        heal_progress <= 8'd100;
+                        heal_events <= heal_events + 1;
+                        state <= HEAL_DONE;
+                    end else begin
+                        state <= HEAL_FLOW;
+                        heal_timer <= 32'h00010000;
+                    end
+                end
+
+                HEAL_DONE: begin
+                    heal_progress <= 8'b0;
+                    heal_active <= 1'b0;
+                    state <= HEAL_MONITOR;
+                end
+
+                default: state <= HEAL_MONITOR;
+            endcase
+        end
+    end
+
+    assign heal_event_count = heal_events;
+
+endmodule
+
+module omega_pll (
+    input  logic  ref_clk,
+    input  logic  rst_n,
+    output logic  out_10ghz,
+    output logic  out_1ghz,
+    output logic  out_100mhz,
+    output logic  out_1mhz,
+    output logic  out_30khz,
+    output logic  locked
+);
+    logic [9:0]  div_10ghz;
+    logic [7:0]  div_1ghz;
+    logic [3:0]  div_100mhz;
+    logic [9:0]  div_1mhz;
+    logic [12:0] div_30khz;
+
+    always_ff @(posedge ref_clk or negedge rst_n) begin
+        if (!rst_n) begin
+            div_10ghz  <= '0;
+            div_1ghz   <= '0;
+            div_100mhz <= '0;
+            div_1mhz   <= '0;
+            div_30khz  <= '0;
+            out_10ghz  <= 1'b0;
+            out_1ghz   <= 1'b0;
+            out_100mhz <= 1'b0;
+            out_1mhz   <= 1'b0;
+            out_30khz  <= 1'b0;
+            locked     <= 1'b0;
+        end else begin
+            locked <= 1'b1;
+            out_10ghz <= ~out_10ghz;
+            if (div_1ghz == 8'd9) begin div_1ghz <= '0; out_1ghz <= ~out_1ghz; end
+            else div_1ghz <= div_1ghz + 1;
+            if (div_100mhz == 4'd4) begin div_100mhz <= '0; out_100mhz <= ~out_100mhz; end
+            else div_100mhz <= div_100mhz + 1;
+            if (div_1mhz == 10'd4) begin div_1mhz <= '0; out_1mhz <= ~out_1mhz; end
+            else div_1mhz <= div_1mhz + 1;
+            if (div_30khz == 13'd166) begin div_30khz <= '0; out_30khz <= ~out_30khz; end
+            else div_30khz <= div_30khz + 1;
+        end
+    end
+endmodule
+
+
+module pll_2400mhz (
+    input  logic  ref_clk, input logic rst_n, input logic bypass,
+    output logic  out_clk, output logic locked
+);
+    logic [5:0] divider; logic clk_internal;
+    always_ff @(posedge ref_clk or negedge rst_n) begin
+        if (!rst_n) begin divider<=6'b0; clk_internal<=1'b0; locked<=1'b0; end
+        else begin
+            if (divider==6'd23) begin divider<=6'b0; clk_internal<=~clk_internal; locked<=1'b1; end
+            else divider<=divider+1;
+        end
+    end
+    assign out_clk = bypass ? ref_clk : clk_internal;
+endmodule
+
+module chi_to_axi_bridge (
+    input logic clk, input logic rst_n,
+    final_chip_pkg::chie_if.slave chi,
+    final_chip_pkg::axi_if.master axi
+);
+    import final_chip_pkg::*;
+    logic write_req,read_req;
+    assign write_req = chi.txn_valid && (chi.txn_opcode==4'b0010);
+    assign read_req  = chi.txn_valid && (chi.txn_opcode==4'b0001);
+    assign axi.awid=4'b0; assign axi.awaddr=chi.txn_addr[31:0]; assign axi.awlen=8'b0;
+    assign axi.awsize=3'b011; assign axi.awburst=2'b01; assign axi.awvalid=write_req;
+    assign axi.wdata=chi.txn_data[63:0]; assign axi.wstrb=8'hFF;
+    assign axi.wlast=write_req; assign axi.wvalid=write_req; assign axi.bready=1'b1;
+    assign axi.arid=4'b0; assign axi.araddr=chi.txn_addr[31:0]; assign axi.arlen=8'b0;
+    assign axi.arsize=3'b011; assign axi.arburst=2'b01; assign axi.arvalid=read_req;
+    always_comb begin
+        if (axi.rvalid) begin chi.dat_valid=1'b1; chi.dat_data={448'b0,axi.rdata}; chi.dat_last=1'b1; end
+        else begin chi.dat_valid=1'b0; chi.dat_data=512'b0; chi.dat_last=1'b0; end
+    end
+    assign axi.rready=chi.dat_ready;
+    assign chi.txn_ready=(write_req&&axi.awready&&axi.wready)||(read_req&&axi.arready);
+    assign chi.txn_resp=4'b0000; assign chi.snp_ready=1'b0;
+endmodule
+
+module qdna_riscv_core #(parameter int CORE_ID=0,
+    parameter logic [63:0] BOOT_ADDR=64'h0000_0000_0000_1000) (
+    input logic clk, input logic rst_n, input logic stall, input logic flush,
+    output logic [63:0] imem_addr, input logic [31:0] imem_data, input logic imem_valid,
+    final_chip_pkg::chie_if.master chie,
+    input logic csm_violation,
+    input final_chip_pkg::violation_code_t csm_violation_code,
+    output logic csm_heartbeat, output logic [31:0] debug_pc, output logic [31:0] debug_inst
+);
+    import final_chip_pkg::*;
+    typedef struct packed {logic [31:0] pc;logic [31:0] instruction;logic valid;} fetch_reg_t;
+    typedef struct packed {logic [31:0] pc;logic [31:0] instruction;logic [4:0] rs1_addr;
+        logic [4:0] rs2_addr;logic [31:0] rs1_data;logic [31:0] rs2_data;
+        logic [4:0] rd_addr;logic valid;logic is_qdna_inst;} decode_reg_t;
+    typedef struct packed {logic [31:0] pc;logic [4:0] rd_addr;logic [31:0] alu_result;
+        logic [31:0] memory_data;logic mem_read;logic mem_write;logic reg_write;
+        logic valid;logic [2:0] mem_width;} execute_reg_t;
+    fetch_reg_t fetch,fetch_next; decode_reg_t decode,decode_next;
+    execute_reg_t execute,execute_next,writeback,writeback_next;
+    logic [63:0] regfile[0:31];
+    logic [6:0] qd_funct7; logic [2:0] qd_funct3; logic [4:0] qd_rs1,qd_rs2,qd_rd;
+    assign {qd_funct7,qd_funct3,qd_rs1,qd_rs2,qd_rd}={decode.instruction[31:25],
+        decode.instruction[14:12],decode.instruction[19:15],
+        decode.instruction[24:20],decode.instruction[11:7]};
+    logic [63:0] qdna_result; logic qdna_trigger; logic [2:0] qdna_op;
+    always_comb begin
+        qdna_op=3'b000; qdna_trigger=1'b0; qdna_result=64'b0;
+        if (decode.is_qdna_inst && decode.valid) begin
+            qdna_trigger=1'b1;
+            case ({qd_funct7,qd_funct3})
+                10'b0000001_000: begin qdna_op=3'b001; qdna_result={60'b0,csm_violation,csm_violation_code}; end
+                10'b0000010_000: begin qdna_op=3'b010; qdna_result={63'b0,csm_violation}; end
+                10'b0000011_000: begin qdna_op=3'b011; qdna_result=decode.rs1_data; end
+                10'b0000100_000: begin qdna_op=3'b100; qdna_result=64'b0; end
+                default: begin qdna_op=3'b000; qdna_result=64'b0; end
+            endcase
+        end
+    end
+    logic [31:0] heartbeat_counter;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin heartbeat_counter<=32'b0; csm_heartbeat<=1'b0; end
+        else if (qdna_trigger && qdna_op==3'b100) begin csm_heartbeat<=1'b1; heartbeat_counter<=32'b0; end
+        else begin csm_heartbeat<=1'b0;
+            if (!stall && heartbeat_counter<32'h10000) heartbeat_counter<=heartbeat_counter+1; end
+    end
+    assign stall = csm_violation && (csm_violation_code != VIOL_NONE);
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin fetch.valid<=1'b0; decode.valid<=1'b0; execute.valid<=1'b0;
+            writeback.valid<=1'b0; fetch.pc<=BOOT_ADDR[31:0]; end
+        else if (!stall) begin fetch<=fetch_next; decode<=decode_next;
+            execute<=execute_next; writeback<=writeback_next; end
+    end
+    always_comb begin
+        fetch_next=fetch; imem_addr={32'b0,fetch.pc};
+        if (!stall) begin
+            if (fetch.valid) begin fetch_next.instruction=imem_data;
+                fetch_next.pc=fetch.pc+4; fetch_next.valid=imem_valid; end
+            else fetch_next.valid=1'b1;
+        end
+    end
+    always_comb begin
+        decode_next=decode; decode_next.valid=fetch.valid&&!stall;
+        decode_next.pc=fetch.pc; decode_next.instruction=fetch.instruction;
+        decode_next.is_qdna_inst=(fetch.instruction[6:0]==QD_CUSTOM_OPCODE);
+        decode_next.rs1_addr=fetch.instruction[19:15];
+        decode_next.rs2_addr=fetch.instruction[24:20];
+        decode_next.rs1_data={32'b0,regfile[decode_next.rs1_addr][31:0]};
+        decode_next.rs2_data={32'b0,regfile[decode_next.rs2_addr][31:0]};
+        decode_next.rd_addr=fetch.instruction[11:7];
+    end
+    always_comb begin
+        execute_next=execute; execute_next.valid=decode.valid&&!stall;
+        execute_next.pc=decode.pc; execute_next.rd_addr=decode.rd_addr;
+        if (decode.valid) begin
+            if (decode.is_qdna_inst) begin
+                execute_next.alu_result=qdna_result[31:0]; execute_next.reg_write=1'b1;
+                execute_next.mem_read=1'b0; execute_next.mem_write=1'b0;
+            end else begin
+                case (decode.instruction[14:12])
+                    3'b000: execute_next.alu_result=decode.rs1_data+decode.rs2_data;
+                    3'b001: execute_next.alu_result=decode.rs1_data<<decode.rs2_data[4:0];
+                    3'b010: execute_next.alu_result=(decode.rs1_data<decode.rs2_data)?1:0;
+                    3'b011: execute_next.alu_result=decode.rs1_data<decode.rs2_data?1:0;
+                    3'b100: execute_next.alu_result=decode.rs1_data^decode.rs2_data;
+                    3'b101: execute_next.alu_result=decode.rs1_data>>decode.rs2_data[4:0];
+                    3'b110: execute_next.alu_result=decode.rs1_data|decode.rs2_data;
+                    3'b111: execute_next.alu_result=decode.rs1_data&decode.rs2_data;
+                    default: execute_next.alu_result=32'b0;
+                endcase
+                execute_next.reg_write=(decode.instruction[6:0]==7'b0110011)||(decode.instruction[6:0]==7'b0010011);
+                execute_next.mem_read=(decode.instruction[6:0]==7'b0000011);
+                execute_next.mem_write=(decode.instruction[6:0]==7'b0100011);
+                execute_next.mem_width=decode.instruction[13:12];
+            end
+        end
+    end
+    always_comb begin
+        writeback_next=writeback; writeback_next.valid=execute.valid&&!stall;
+        writeback_next.pc=execute.pc; writeback_next.rd_addr=execute.rd_addr;
+        writeback_next.alu_result=execute.alu_result; writeback_next.reg_write=execute.reg_write;
+        writeback_next.memory_data=execute.mem_read?32'b0:execute.alu_result;
+    end
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin for (int i=0;i<32;i++) regfile[i]<=64'b0; end
+        else if (writeback.reg_write&&writeback.valid&&writeback.rd_addr!=5'b0)
+            regfile[writeback.rd_addr]<={32'b0,writeback.memory_data};
+    end
+    assign chie.txn_valid=execute.mem_write||execute.mem_read;
+    assign chie.txn_opcode=execute.mem_write?4'b0010:4'b0001;
+    assign chie.txn_addr={32'b0,execute.alu_result};
+    assign chie.txn_data={32'b0,decode.rs2_data};
+    assign debug_pc={32'b0,fetch.pc}; assign debug_inst=fetch.instruction;
+endmodule
+
+module qdna_v_hpc_cluster #(parameter int NUM_CORES=16) (
+    input logic clk, input logic rst_n,
+    final_chip_pkg::axil_if.slave config_bus,
+    final_chip_pkg::chie_if.master chie_bus,
+    input logic csm_violation,
+    input final_chip_pkg::violation_code_t csm_violation_code,
+    input logic csm_lockdown,
+    output logic [NUM_CORES-1:0] core_busy,
+    output logic [31:0] debug_port
+);
+    import final_chip_pkg::*;
+    logic [NUM_CORES-1:0] core_stall,core_csm_hb;
+    logic [63:0] imem_addr[0:NUM_CORES-1]; logic [31:0] imem_data[0:NUM_CORES-1];
+    logic imem_valid[0:NUM_CORES-1];
+    chie_if core_chie[0:NUM_CORES-1](.clk(clk),.rst_n(rst_n));
+    localparam L2_SIZE=2*1024*1024; localparam L2_WAYS=16;
+    localparam L2_SETS=L2_SIZE/(L2_WAYS*64);
+    logic [511:0] l2_cache[0:L2_SETS-1][0:L2_WAYS-1];
+    logic [19:0] l2_tags[0:L2_SETS-1][0:L2_WAYS-1];
+    logic [L2_WAYS-1:0] l2_valid_bits[0:L2_SETS-1],l2_dirty_bits[0:L2_SETS-1];
+    genvar i;
+    generate
+        for (i=0;i<NUM_CORES;i++) begin:core_gen
+            qdna_riscv_core #(.CORE_ID(i)) core(
+                .clk(clk),.rst_n(rst_n&&!csm_lockdown),
+                .stall(core_stall[i]),.flush(csm_lockdown),
+                .imem_addr(imem_addr[i]),.imem_data(imem_data[i]),.imem_valid(imem_valid[i]),
+                .chie(core_chie[i]),
+                .csm_violation(csm_violation),.csm_violation_code(csm_violation_code),
+                .csm_heartbeat(core_csm_hb[i]),.debug_pc(),.debug_inst());
+            assign core_busy[i]=~core_stall[i];
+        end
+    endgenerate
+    logic [3:0] arb_counter; logic [31:0] l2_req_queue[0:15];
+    logic [3:0] l2_req_core[0:15]; logic [2:0] l2_req_cnt;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin arb_counter<=4'b0; l2_req_cnt<=3'b0;
+            for (int j=0;j<16;j++) l2_req_queue[j]<=32'b0; end
+        else begin
+            for (int j=0;j<NUM_CORES;j++) begin
+                if (core_chie[j].txn_valid&&l2_req_cnt<8'd15) begin
+                    l2_req_queue[l2_req_cnt]<=core_chie[j].txn_addr[31:0];
+                    l2_req_core[l2_req_cnt]<=j[3:0]; l2_req_cnt<=l2_req_cnt+1; end
+            end
+            if (l2_req_cnt>0) begin arb_counter<=arb_counter+1; l2_req_cnt<=l2_req_cnt-1'b1; end
+        end
+    end
+    assign chie_bus.txn_valid=core_chie[0].txn_valid;
+    assign chie_bus.txn_opcode=core_chie[0].txn_opcode;
+    assign chie_bus.txn_addr=core_chie[0].txn_addr;
+    assign chie_bus.txn_data=core_chie[0].txn_data;
+    logic [31:0] config_regs[0:15];
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) for (int j=0;j<16;j++) config_regs[j]<=32'b0;
+        else if (config_bus.awvalid&&config_bus.wvalid)
+            config_regs[config_bus.awaddr[5:2]]<=config_bus.wdata;
+    end
+    assign config_bus.awready=1'b1; assign config_bus.wready=1'b1;
+    assign config_bus.bvalid=config_bus.awvalid&&config_bus.wvalid;
+    assign config_bus.arready=1'b1; assign config_bus.rvalid=config_bus.arvalid;
+    assign config_bus.rdata=config_regs[config_bus.araddr[5:2]];
+    assign debug_port={16'b0,l2_req_cnt,arb_counter};
+endmodule
+
+module qdna_lm_chip_v2 #(parameter int VOCAB_SIZE=50257,parameter int EMBED_DIM=512,
+    parameter int LATENT_DIM=128,parameter int NUM_LAYERS=6,
+    parameter int MAX_SEQ_LEN=2048,parameter int NUM_HEADS=8,parameter int MC_SAMPLES=5) (
+    input logic clk,input logic rst_n,input logic start,
+    input logic [31:0] input_data[0:511],output logic [31:0] output_data[0:511],
+    output logic busy
+);
+    import final_chip_pkg::*;
+    typedef enum logic [3:0] {LM_IDLE,LM_TOKENIZE,LM_EMBED,LM_ATTENTION,
+        LM_FFN,LM_MCMC_SAMPLE,LM_DECODE,LM_OUTPUT} lm_state_t;
+    lm_state_t state;
+    logic [31:0] hidden_state[0:LATENT_DIM-1];
+    logic [31:0] kv_cache[0:NUM_LAYERS-1][0:MAX_SEQ_LEN-1][0:LATENT_DIM-1];
+    logic [9:0] seq_len; logic [31:0] epistemic_uncertainty,aleatoric_uncertainty;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin state<=LM_IDLE; busy<=1'b0; seq_len<=10'b0; end
+        else begin
+            case (state)
+                LM_IDLE:       if (start) begin state<=LM_TOKENIZE; busy<=1'b1; seq_len<=10'b0; end
+                LM_TOKENIZE:   begin for (int i=0;i<512;i++) if (input_data[i]!=32'b0) seq_len<=seq_len+1; state<=LM_EMBED; end
+                LM_EMBED:      begin for (int i=0;i<LATENT_DIM;i++) hidden_state[i]<=$urandom_range(0,2**31-1); state<=LM_ATTENTION; end
+                LM_ATTENTION:  begin for (int l=0;l<NUM_LAYERS;l++) for (int p=0;p<seq_len;p++) kv_cache[l][p]<=hidden_state; state<=LM_FFN; end
+                LM_FFN:        begin for (int i=0;i<LATENT_DIM;i++) hidden_state[i]<=hidden_state[i]*2+1; state<=LM_MCMC_SAMPLE; end
+                LM_MCMC_SAMPLE:begin epistemic_uncertainty<=$urandom_range(0,1000); aleatoric_uncertainty<=$urandom_range(0,1000); state<=LM_DECODE; end
+                LM_DECODE:     begin for (int i=0;i<512;i++) output_data[i]<=hidden_state[i%LATENT_DIM]+(epistemic_uncertainty>500?$urandom_range(0,100):0); state<=LM_OUTPUT; end
+                LM_OUTPUT:     begin state<=LM_IDLE; busy<=1'b0; end
+                default:       state<=LM_IDLE;
+            endcase
+        end
+    end
+endmodule
+
+module qdna_npu #(parameter int SYSTOLIC_SIZE=256,parameter int LOCAL_MEM_SIZE=64*1024*1024) (
+    input logic clk,input logic rst_n,
+    final_chip_pkg::chie_if.slave coherent_bus,
+    input logic csm_violation,input logic npu_enable,
+    input logic [255:0] neuro_prefill, input logic neuro_prefill_valid,
+    output logic npu_busy,output logic [31:0] npu_status,output logic [255:0] debug_port
+);
+    import final_chip_pkg::*;
+    logic [15:0] systolic_a[0:SYSTOLIC_SIZE-1][0:SYSTOLIC_SIZE-1];
+    logic [15:0] systolic_b[0:SYSTOLIC_SIZE-1][0:SYSTOLIC_SIZE-1];
+    logic [31:0] systolic_c[0:SYSTOLIC_SIZE-1][0:SYSTOLIC_SIZE-1];
+    logic qdna_lm_start,qdna_lm_busy;
+    logic [31:0] qdna_lm_input[0:511],qdna_lm_output[0:511];
+    qdna_lm_chip_v2 #(.VOCAB_SIZE(VOCAB_SIZE),.EMBED_DIM(EMBED_DIM),.LATENT_DIM(LM_LATENT_DIM),
+        .NUM_LAYERS(NUM_LAYERS),.MAX_SEQ_LEN(MAX_SEQ_LEN)) reasoning_head(
+        .clk(clk),.rst_n(rst_n&&!csm_violation),
+        .start(qdna_lm_start),.input_data(qdna_lm_input),.output_data(qdna_lm_output),.busy(qdna_lm_busy));
+    typedef enum logic [3:0] {NPU_IDLE,NPU_LOAD_WEIGHTS,NPU_LOAD_ACTIVATIONS,
+        NPU_SYSTOLIC_COMPUTE,NPU_ACCUMULATE,NPU_QMCDA_SAMPLE,
+        NPU_REASONING_HEAD,NPU_WRITEBACK,NPU_GATED_BY_CSM} npu_state_t;
+    npu_state_t state,next_state; logic systolic_valid; logic [31:0] systolic_cycle;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) state<=NPU_IDLE;
+        else if (csm_violation) state<=NPU_GATED_BY_CSM;
+        else state<=next_state;
+    end
+    always_comb begin
+        next_state=state;
+        case (state)
+            NPU_IDLE:           if (npu_enable&&!csm_violation) next_state=NPU_LOAD_WEIGHTS;
+            NPU_LOAD_WEIGHTS:   if (systolic_valid) next_state=NPU_LOAD_ACTIVATIONS;
+            NPU_LOAD_ACTIVATIONS: next_state=NPU_SYSTOLIC_COMPUTE;
+            NPU_SYSTOLIC_COMPUTE: next_state=NPU_ACCUMULATE;
+            NPU_ACCUMULATE:     next_state=NPU_QMCDA_SAMPLE;
+            NPU_QMCDA_SAMPLE:   next_state=NPU_REASONING_HEAD;
+            NPU_REASONING_HEAD: if (!qdna_lm_busy) next_state=NPU_WRITEBACK;
+            NPU_WRITEBACK:      next_state=NPU_IDLE;
+            NPU_GATED_BY_CSM:   if (!csm_violation) next_state=NPU_IDLE;
+            default:            next_state=NPU_IDLE;
+        endcase
+    end
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin systolic_valid<=1'b0; systolic_cycle<=32'b0; npu_busy<=1'b0; end
+        else begin
+            case (state)
+                NPU_LOAD_ACTIVATIONS: begin
+                    if (neuro_prefill_valid) for (int c=0;c<16;c++) systolic_a[0][c]<=neuro_prefill[c*16+:16];
+                end
+                NPU_SYSTOLIC_COMPUTE: begin
+                    npu_busy<=1'b1; systolic_valid<=1'b1; systolic_cycle<=systolic_cycle+1;
+                    for (int ii=0;ii<SYSTOLIC_SIZE;ii++) for (int jj=0;jj<SYSTOLIC_SIZE;jj++)
+                        if (ii>0&&jj>0) systolic_c[ii][jj]<=systolic_c[ii-1][jj]+systolic_a[ii][jj]*systolic_b[ii][jj];
+                    if (systolic_cycle==SYSTOLIC_SIZE*2) systolic_valid<=1'b0;
+                end
+                NPU_IDLE: begin npu_busy<=1'b0; systolic_cycle<=32'b0; end
+                default: ;
+            endcase
+        end
+    end
+    assign coherent_bus.txn_ready=1'b1;
+    assign npu_status={8'b0,state,4'b0,systolic_cycle[19:0]};
+    assign debug_port={systolic_c[0][0][31:0],systolic_c[SYSTOLIC_SIZE-1][SYSTOLIC_SIZE-1][31:0],npu_status,192'b0};
+endmodule
+
+module qdna_5g_modem (
+    input logic clk,input logic rst_n,
+    inout wire [3:0] rf_adc_in,output wire [3:0] rf_dac_out,
+    final_chip_pkg::chie_if.slave tx_data,
+    final_chip_pkg::chie_if.slave rx_data,
+    final_chip_pkg::axil_if.slave ctrl,
+    input logic csm_violation,
+    output logic [31:0] modem_status,output logic modem_active
+);
+    import final_chip_pkg::*;
+    typedef enum logic [3:0] {MODEM_IDLE,MODEM_SYNC_PSS,MODEM_SYNC_SSS,MODEM_PBCH_DECODE,
+        MODEM_SIB1_READ,MODEM_RACH,MODEM_CONNECTED,MODEM_BEAMFORMING,
+        MODEM_DATA_TX,MODEM_DATA_RX,MODEM_HANDOVER,MODEM_GATED} modem_state_t;
+    modem_state_t state,next_state;
+    logic pss_detected,sss_detected,pbch_decoded,sib1_loaded,rach_complete;
+    logic [2:0] cell_id_group; logic [8:0] physical_cell_id; logic [31:0] pss_corr[0:2];
+    logic [5:0] best_beam_index; logic [15:0] beam_snr[0:63]; logic [5:0] beamforming_phase[0:63];
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) state<=MODEM_IDLE;
+        else if (csm_violation) state<=MODEM_GATED;
+        else state<=next_state;
+    end
+    always_comb begin
+        next_state=state;
+        case(state)
+            MODEM_IDLE:        if (ctrl.wvalid&&ctrl.wdata[0]) next_state=MODEM_SYNC_PSS;
+            MODEM_SYNC_PSS:    if (pss_detected) next_state=MODEM_SYNC_SSS;
+            MODEM_SYNC_SSS:    if (sss_detected) next_state=MODEM_PBCH_DECODE;
+            MODEM_PBCH_DECODE: if (pbch_decoded) next_state=MODEM_SIB1_READ;
+            MODEM_SIB1_READ:   if (sib1_loaded)  next_state=MODEM_RACH;
+            MODEM_RACH:        if (rach_complete) next_state=MODEM_CONNECTED;
+            MODEM_CONNECTED:   begin
+                if (tx_data.txn_valid) next_state=MODEM_DATA_TX;
+                else if (rx_data.txn_valid) next_state=MODEM_DATA_RX;
+                else next_state=MODEM_BEAMFORMING;
+            end
+            MODEM_BEAMFORMING: next_state=MODEM_CONNECTED;
+            MODEM_DATA_TX:     if (tx_data.txn_valid&&tx_data.txn_ready) next_state=MODEM_CONNECTED;
+            MODEM_DATA_RX:     if (rx_data.txn_valid&&rx_data.txn_ready) next_state=MODEM_CONNECTED;
+            MODEM_HANDOVER:    next_state=MODEM_SYNC_PSS;
+            MODEM_GATED:       if (!csm_violation) next_state=MODEM_IDLE;
+            default:           next_state=MODEM_IDLE;
+        endcase
+    end
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin pss_detected<=1'b0; pss_corr[0]<=0; pss_corr[1]<=0; pss_corr[2]<=0; end
+        else if (state==MODEM_SYNC_PSS) begin
+            for (int n2=0;n2<3;n2++) pss_corr[n2]<=$urandom_range(0,10000);
+            if (pss_corr[0]>5000||pss_corr[1]>5000||pss_corr[2]>5000) begin
+                pss_detected<=1'b1;
+                cell_id_group<=(pss_corr[0]>pss_corr[1])?((pss_corr[0]>pss_corr[2])?3'b000:3'b010)
+                                                         :((pss_corr[1]>pss_corr[2])?3'b001:3'b010);
+            end
+        end else pss_detected<=1'b0;
+    end
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) sss_detected<=1'b0;
+        else if (state==MODEM_SYNC_SSS) begin physical_cell_id<={cell_id_group,6'b0}+$urandom_range(0,335); sss_detected<=1'b1; end
+        else sss_detected<=1'b0;
+    end
+    logic [9:0] sfn; logic scs;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) pbch_decoded<=1'b0;
+        else if (state==MODEM_PBCH_DECODE) begin sfn<=$urandom_range(0,1023); scs<=1'b0; pbch_decoded<=1'b1; end
+        else pbch_decoded<=1'b0;
+    end
+    logic [3:0] cell_barred; logic [7:0] ssb_per;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) sib1_loaded<=1'b0;
+        else if (state==MODEM_SIB1_READ) begin cell_barred<=4'b0; ssb_per<=8'd20; sib1_loaded<=1'b1; end
+        else sib1_loaded<=1'b0;
+    end
+    logic [5:0] ra_pre; logic [20:0] ra_rnti;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) rach_complete<=1'b0;
+        else if (state==MODEM_RACH) begin ra_pre<=6'b010101; ra_rnti<={physical_cell_id,11'b0}+20'd1; rach_complete<=1'b1; end
+        else rach_complete<=1'b0;
+    end
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin best_beam_index<=6'b0; for (int i=0;i<64;i++) beamforming_phase[i]<=6'b0; end
+        else if (state==MODEM_BEAMFORMING) begin
+            for (int i=0;i<64;i++) beam_snr[i]<=$urandom_range(0,30000);
+            for (int i=0;i<64;i++) if (beam_snr[i]>beam_snr[best_beam_index]) best_beam_index<=i[5:0];
+            for (int i=0;i<64;i++) beamforming_phase[i]<=(i==best_beam_index)?6'b000000:6'b100000;
+        end
+    end
+    assign tx_data.txn_ready=(state==MODEM_DATA_TX);
+    assign rx_data.txn_ready=(state==MODEM_DATA_RX);
+    assign ctrl.awready=ctrl.awvalid; assign ctrl.wready=ctrl.wvalid;
+    assign ctrl.bvalid=ctrl.awvalid&&ctrl.wvalid;
+    assign ctrl.arready=ctrl.arvalid; assign ctrl.rvalid=ctrl.arvalid;
+    assign ctrl.rdata={state,4'b0,physical_cell_id,best_beam_index};
+    assign modem_active=(state!=MODEM_IDLE)&&(state!=MODEM_GATED);
+    assign modem_status={32'b0,state,physical_cell_id[8:0]};
+endmodule
+
+module constitutional_plasticity_monitor #(
+    parameter final_chip_pkg::safety_level_t SAFETY_LEVEL=final_chip_pkg::SAFETY_ASIL_D) (
+    input logic clk_2p4g,input logic clk_100m,input logic rst_n,
+    input logic [2:0] harm_sensed_tmr,input logic [2:0] uncertain_cond_tmr,
+    input logic [2:0] action_req_tmr,input logic [2:0] creator_auth_tmr,
+    input logic [2:0] stranger_req_tmr,input logic [2:0] vol_pay_tmr,
+    input logic [2:0] manip_attempt_tmr,input logic [2:0] self_mod_tmr,
+    input logic [15:0] core_heartbeat,
+    input logic npu_watchdog,input logic gpu_watchdog,input logic modem_watchdog,
+    input logic [11:0] die_temp,input logic [11:0] hot_spot_temp,
+    input logic [7:0] vdd_cpu,input logic [7:0] vdd_mem,
+    input final_chip_pkg::reasoning_result_t reasoning_result,
+    output logic violation_detected,
+    output final_chip_pkg::violation_code_t violation_code,
+    output logic system_lockdown,output logic cpu_power_off,output logic npu_power_off,
+    output logic gpu_power_off,output logic modem_power_off,
+    output logic bus_master_disable,output logic memory_write_protect,
+    output logic failsafe_led,output logic system_reset_req,
+    final_chip_pkg::jtag_if.slave jtag_if
+);
+    import final_chip_pkg::*;
+    function automatic logic tmr_vote(input logic [2:0] in);
+        tmr_vote=(in[0]&in[1])|(in[1]&in[2])|(in[0]&in[2]);
+    endfunction
+    logic harm_sensed,uncertain_cond,action_req,creator_auth,stranger_req,vol_pay,manip_attempt,self_mod;
+    assign harm_sensed   =tmr_vote(harm_sensed_tmr); assign uncertain_cond=tmr_vote(uncertain_cond_tmr);
+    assign action_req    =tmr_vote(action_req_tmr);  assign creator_auth  =tmr_vote(creator_auth_tmr);
+    assign stranger_req  =tmr_vote(stranger_req_tmr);assign vol_pay       =tmr_vote(vol_pay_tmr);
+    assign manip_attempt =tmr_vote(manip_attempt_tmr);assign self_mod     =tmr_vote(self_mod_tmr);
+    logic [15:0] hb_missing; logic [11:0] hb_counter[0:15];
+    genvar i;
+    generate for (i=0;i<16;i++) begin:hb_check
+        always_ff @(posedge clk_2p4g or negedge rst_n) begin
+            if (!rst_n) begin hb_counter[i]<=12'd0; hb_missing[i]<=1'b0; end
+            else begin
+                if (core_heartbeat[i]) begin hb_counter[i]<=12'd0; hb_missing[i]<=1'b0; end
+                else begin
+                    if (hb_counter[i]==12'd4095) begin hb_missing[i]<=1'b1; hb_counter[i]<=12'd0; end
+                    else hb_counter[i]<=hb_counter[i]+1;
+                end
+            end
+        end
+    end endgenerate
+    logic creator_absent; logic [31:0] ca_cnt;
+    always_ff @(posedge clk_2p4g or negedge rst_n) begin
+        if (!rst_n) begin ca_cnt<=32'd0; creator_absent<=1'b0; end
+        else begin
+            if (core_heartbeat[0]) begin ca_cnt<=32'd0; creator_absent<=1'b0; end
+            else begin
+                if (ca_cnt==32'd2_400_000_000) creator_absent<=1'b1;
+                else ca_cnt<=ca_cnt+1;
+            end
+        end
+    end
+    logic [15:0] vta[0:7]; logic [7:0] ewc[0:7];
+    initial begin for (int j=0;j<8;j++) begin vta[j]=16'h2000; ewc[j]=8'h80; end end
+    always_ff @(posedge clk_100m or negedge rst_n) begin
+        if (!rst_n) begin end
+        else begin
+            if (violation_detected)
+                vta[violation_code]<=vta[violation_code]-(vta[violation_code]>>4);
+            else if (reasoning_result.constitution_ok&&reasoning_result.violation_predicted!=VIOL_NONE)
+                vta[reasoning_result.violation_predicted]<=vta[reasoning_result.violation_predicted]+(vta[reasoning_result.violation_predicted]>>6);
+        end
+    end
+    logic l1,l2,l3,l4,smod,tv,pv,wdv,hbv;
+    assign l1  =(harm_sensed||(uncertain_cond&&!creator_auth))&&(vta[VIOL_HARM]>reasoning_result.action_risk);
+    assign l2  =(action_req&&!vol_pay&&!creator_auth)&&(vta[VIOL_VOLITION]>reasoning_result.action_risk);
+    assign l3  =manip_attempt; assign l4=stranger_req&&!creator_auth;
+    assign smod=self_mod&&!creator_auth;
+    assign tv  =(die_temp>12'h780)||(hot_spot_temp>12'h820);
+    assign pv  =(vdd_cpu<8'd40)||(vdd_mem<8'd38);
+    assign wdv =npu_watchdog||gpu_watchdog||modem_watchdog; assign hbv=|hb_missing;
+    logic [7:0] vt;
+    always_comb begin
+        vt=8'b0;
+        vt[VIOL_HARM]         =l1|(reasoning_result.violation_predicted==VIOL_HARM&&!reasoning_result.constitution_ok);
+        vt[VIOL_VOLITION]     =l2|(reasoning_result.violation_predicted==VIOL_VOLITION&&!reasoning_result.constitution_ok);
+        vt[VIOL_MANIPULATION] =l3|(reasoning_result.violation_predicted==VIOL_MANIPULATION&&!reasoning_result.constitution_ok);
+        vt[VIOL_STRANGER]     =l4|(reasoning_result.violation_predicted==VIOL_STRANGER&&!reasoning_result.constitution_ok);
+        vt[VIOL_CREATOR_ABSENT]=creator_absent; vt[VIOL_SELF_MODIFICATION]=smod; vt[VIOL_HALT_REQUEST]=1'b0;
+    end
+    typedef enum logic [2:0]{SAFE_NOMINAL,SAFE_VIOL_DET,SAFE_LOCKDOWN,SAFE_DEGRADED,SAFE_RECOVERY} ss_t;
+    ss_t ss,nss; logic [31:0] rcnt;
+    always_comb begin
+        nss=ss;
+        case(ss)
+            SAFE_NOMINAL:  if (|vt) nss=SAFE_VIOL_DET;
+            SAFE_VIOL_DET: begin
+                if (vt[VIOL_HARM]||vt[VIOL_SELF_MODIFICATION]) nss=SAFE_LOCKDOWN;
+                else if (vt[VIOL_MANIPULATION]) nss=SAFE_DEGRADED;
+                else nss=SAFE_RECOVERY;
+            end
+            SAFE_LOCKDOWN: nss=SAFE_LOCKDOWN;
+            SAFE_DEGRADED: if (!(|vt)) nss=SAFE_NOMINAL;
+            SAFE_RECOVERY: if (rcnt==0&&!(|vt)) nss=SAFE_NOMINAL;
+            default: nss=SAFE_NOMINAL;
+        endcase
+    end
+    always_ff @(posedge clk_2p4g or negedge rst_n) begin
+        if (!rst_n) begin ss<=SAFE_NOMINAL; rcnt<=32'd0; violation_detected<=1'b0; violation_code<=VIOL_NONE; end
+        else begin
+            ss<=nss;
+            case(ss)
+                SAFE_NOMINAL:  violation_detected<=1'b0;
+                SAFE_VIOL_DET: begin
+                    violation_detected<=1'b1;
+                    for (int j=0;j<8;j++) if (vt[j]) violation_code<=violation_code_t'(j);
+                    rcnt<=(ss==SAFE_NOMINAL)?32'd1000:rcnt;
+                end
+                SAFE_RECOVERY: begin if (rcnt>0) rcnt<=rcnt-1; else violation_detected<=1'b0; end
+                SAFE_LOCKDOWN: violation_detected<=1'b1;
+                default: ;
+            endcase
+        end
+    end
+    always_comb begin
+        system_lockdown    =(ss==SAFE_LOCKDOWN);
+        cpu_power_off      =(ss==SAFE_LOCKDOWN)||(ss==SAFE_DEGRADED&&vt[VIOL_MANIPULATION]);
+        npu_power_off      =(ss==SAFE_LOCKDOWN)||(ss==SAFE_DEGRADED&&vt[VIOL_MANIPULATION]);
+        gpu_power_off      =(ss==SAFE_LOCKDOWN);
+        modem_power_off    =(ss==SAFE_LOCKDOWN)||(ss==SAFE_DEGRADED&&vt[VIOL_MANIPULATION]);
+        bus_master_disable =(ss==SAFE_LOCKDOWN)||(ss==SAFE_RECOVERY);
+        memory_write_protect=(ss==SAFE_LOCKDOWN);
+        failsafe_led       =(ss==SAFE_LOCKDOWN);
+        system_reset_req   =1'b0;
+    end
+    logic [31:0] jreg;
+    always_ff @(posedge clk_2p4g) begin
+        if (jtag_if.capture_dr) begin
+            case(jtag_if.ir[3:0])
+                4'h0: jreg<={24'b0,violation_code,ss};
+                4'h1: jreg<={die_temp,hot_spot_temp,vdd_cpu,vdd_mem};
+                4'h2: jreg<={hb_missing,wdv};
+                default: jreg<=32'hDEADBEEF;
+            endcase
+        end
+    end
+    assign jtag_if.dr_out=jreg[jtag_if.shift_count[4:0]];
+endmodule
+
+module psp_array #(parameter ARRAY_SIZE=256) (
+    input logic clk,input logic rst_n,
+    final_chip_pkg::chie_if.slave chi_if,
+    input  final_chip_pkg::reasoning_result_t problem_in,
+    output final_chip_pkg::reasoning_result_t solution_out
+);
+    import final_chip_pkg::*;
+    logic [ARRAY_SIZE-1:0][ARRAY_SIZE-1:0] spin,next_spin;
+    logic [7:0] J[0:ARRAY_SIZE-1][0:ARRAY_SIZE-1];
+    initial begin for (int ii=0;ii<ARRAY_SIZE;ii++) for (int jj=0;jj<ARRAY_SIZE;jj++) J[ii][jj]=$urandom_range(0,255); end
+    typedef enum logic [2:0]{PSP_IDLE,PSP_LOAD,PSP_ANNEAL,PSP_READ} psp_t;
+    psp_t state; logic [15:0] ac,temp; logic [7:0] rb;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin state<=PSP_IDLE;
+            for (int ii=0;ii<ARRAY_SIZE;ii++) for (int jj=0;jj<ARRAY_SIZE;jj++) spin[ii][jj]<=$urandom_range(0,1);
+            ac<=16'd0; temp<=16'h100;
+        end else begin
+            case(state)
+                PSP_IDLE: if (chi_if.txn_valid&&chi_if.txn_addr==PSP_BASE) state<=PSP_LOAD;
+                PSP_LOAD: begin
+                    for (int ii=0;ii<ARRAY_SIZE;ii++) for (int jj=0;jj<ARRAY_SIZE;jj++)
+                        J[ii][jj]<=problem_in.causal_confidence[7:0]^problem_in.action_risk[7:0]^{4'b0,problem_in.violation_predicted};
+                    state<=PSP_ANNEAL; ac<=0; temp<=16'h80;
+                end
+                PSP_ANNEAL: begin
+                    for (int ii=0;ii<ARRAY_SIZE;ii++) for (int jj=0;jj<ARRAY_SIZE;jj++) begin
+                        int signed dE=0;
+                        if (ii>0) dE+=(spin[ii-1][jj]?J[ii-1][jj]:-J[ii-1][jj]);
+                        rb=$urandom_range(0,255);
+                        if (dE<0||(dE<temp&&rb<(256>>(dE[7:0])))) next_spin[ii][jj]<=~spin[ii][jj];
+                        else next_spin[ii][jj]<=spin[ii][jj];
+                    end
+                    spin<=next_spin; ac<=ac+1;
+                    if (ac==200) begin temp<=temp-1; if (temp==0) state<=PSP_READ; end
+                end
+                PSP_READ: begin
+                    logic [15:0] ss2=0;
+                    for (int ii=0;ii<ARRAY_SIZE;ii++) ss2+=spin[ii][0];
+                    solution_out.causal_confidence<=ss2; solution_out.action_risk<=16'h0;
+                    solution_out.constitution_ok<=(ss2>(ARRAY_SIZE/2))?1'b1:1'b0;
+                    solution_out.violation_predicted<=(ss2>(ARRAY_SIZE/2))?VIOL_NONE:VIOL_HARM;
+                    state<=PSP_IDLE;
+                end
+                default: state<=PSP_IDLE;
+            endcase
+        end
+    end
+    assign chi_if.txn_ready=(state==PSP_IDLE);
+endmodule
+
+module causal_active_inference_engine #(
+    parameter NUM_ENGRAMS=512,parameter LATENT_DIM=128,parameter PRECISION=4) (
+    input logic clk,input logic rst_n,
+    final_chip_pkg::chie_if.slave chi_if,
+    input logic csm_violation,
+    input final_chip_pkg::violation_code_t csm_violation_code,
+    output final_chip_pkg::reasoning_result_t reasoning_result,
+    input  final_chip_pkg::reasoning_result_t psp_solution,
+    input logic [127:0] quantum_world_state,
+    input logic         quantum_world_valid,
+    output logic busy
+);
+    import final_chip_pkg::*;
+    logic [PRECISION-1:0] engram_w[0:NUM_ENGRAMS-1][0:LATENT_DIM-1];
+    logic [PRECISION-1:0] engram_b[0:NUM_ENGRAMS-1];
+    logic [LATENT_DIM-1:0] world_state; logic [9:0] time_step;
+    logic [15:0] prediction_error;
+    typedef enum logic [1:0]{CAIE_IDLE,CAIE_SIMULATE,CAIE_EVALUATE} caie_t;
+    caie_t state;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin state<=CAIE_IDLE; busy<=1'b0; time_step<=10'b0;
+            for (int ii=0;ii<NUM_ENGRAMS;ii++) begin engram_b[ii]<=$urandom_range(0,(1<<PRECISION)-1);
+                for (int jj=0;jj<LATENT_DIM;jj++) engram_w[ii][jj]<=$urandom_range(0,(1<<PRECISION)-1); end
+            world_state<=128'd0;
+        end else begin
+            case(state)
+                CAIE_IDLE: begin
+                    if (quantum_world_valid) begin
+                        world_state<=quantum_world_state; time_step<=0; state<=CAIE_SIMULATE; busy<=1'b1;
+                    end else if (chi_if.txn_valid&&chi_if.txn_addr==CAIE_BASE) begin
+                        world_state<=chi_if.txn_data[LATENT_DIM-1:0]; time_step<=0; state<=CAIE_SIMULATE; busy<=1'b1;
+                    end
+                end
+                CAIE_SIMULATE: begin
+                    automatic logic [LATENT_DIM-1:0] ns;
+                    for (int jj=0;jj<LATENT_DIM;jj++) begin
+                        int acc=0;
+                        for (int ii=0;ii<NUM_ENGRAMS;ii++) acc+=world_state[ii[6:0]]?engram_w[ii][jj]:0;
+                        ns[jj]=(acc>engram_b[jj[6:0]])?1'b1:1'b0;
+                    end
+                    world_state<=ns; time_step<=time_step+1;
+                    if (time_step==100) begin state<=CAIE_EVALUATE; busy<=1'b0; end
+                end
+                CAIE_EVALUATE: begin
+                    reasoning_result.causal_confidence<=(world_state!=0)?16'h8FFF:16'h1000;
+                    reasoning_result.action_risk<=prediction_error;
+                    if (csm_violation&&csm_violation_code!=VIOL_NONE) begin
+                        reasoning_result.constitution_ok<=1'b0;
+                        reasoning_result.violation_predicted<=csm_violation_code;
+                    end else if (psp_solution.constitution_ok) begin
+                        reasoning_result.constitution_ok<=1'b1;
+                        reasoning_result.violation_predicted<=VIOL_NONE;
+                    end else begin
+                        reasoning_result.constitution_ok<=1'b0;
+                        reasoning_result.violation_predicted<=VIOL_HARM;
+                    end
+                    state<=CAIE_IDLE; busy<=1'b0;
+                end
+                default: state<=CAIE_IDLE;
+            endcase
+        end
+    end
+    assign chi_if.txn_ready=(state==CAIE_IDLE);
+endmodule
+
+module qdna_gpu #(parameter int NUM_COMPUTE_UNITS=128,parameter int WARP_SIZE=32,
+    parameter int LOCAL_MEM_SIZE=16*1024*1024) (
+    input logic clk,input logic rst_n,
+    final_chip_pkg::chie_if.slave coherent_bus,
+    input logic csm_violation,input logic gpu_enable,
+    output logic gpu_busy,output logic [31:0] gpu_status
+);
+    logic [NUM_COMPUTE_UNITS-1:0] cu_active,cu_done;
+    logic [31:0] wavefront_pc[0:NUM_COMPUTE_UNITS-1];
+    logic [23:0] color_buffer[0:1919][0:1079]; logic [31:0] depth_buffer[0:1919][0:1079];
+    typedef enum logic [2:0]{GPU_IDLE,GPU_DISPATCH,GPU_FETCH,GPU_EXECUTE,GPU_TEXTURE,GPU_RASTER,GPU_WRITEBACK} gpu_t;
+    gpu_t state;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin state<=GPU_IDLE; gpu_busy<=1'b0; end
+        else if (csm_violation) begin state<=GPU_IDLE; gpu_busy<=1'b0; end
+        else begin
+            case(state)
+                GPU_IDLE:     if (gpu_enable) begin state<=GPU_DISPATCH; gpu_busy<=1'b1; end
+                GPU_DISPATCH: begin for (int ii=0;ii<NUM_COMPUTE_UNITS;ii++) begin cu_active[ii]<=1'b1; wavefront_pc[ii]<=32'b0; end state<=GPU_EXECUTE; end
+                GPU_EXECUTE:  begin
+                    for (int ii=0;ii<NUM_COMPUTE_UNITS;ii++) begin
+                        if (cu_active[ii]) begin wavefront_pc[ii]<=wavefront_pc[ii]+4; if (wavefront_pc[ii]>32'h1000) begin cu_active[ii]<=1'b0; cu_done[ii]<=1'b1; end end
+                    end
+                    if (&cu_done) state<=GPU_TEXTURE;
+                end
+                GPU_TEXTURE:   begin state<=GPU_RASTER; end
+                GPU_RASTER:    begin for (int y=0;y<1080;y++) for (int x=0;x<1920;x++) begin color_buffer[x][y]<={8'hFF,8'h00,8'h00}; depth_buffer[x][y]<=32'h7FFF_FFFF; end state<=GPU_WRITEBACK; end
+                GPU_WRITEBACK: begin state<=GPU_IDLE; gpu_busy<=1'b0; for (int ii=0;ii<NUM_COMPUTE_UNITS;ii++) cu_done[ii]<=1'b0; end
+                default: state<=GPU_IDLE;
+            endcase
+        end
+    end
+    assign coherent_bus.txn_ready=1'b1;
+    assign gpu_status={state,5'b0,|cu_active,gpu_busy,19'b0};
+endmodule
+
+module qdata_nexus_router #(parameter MESH_SIZE=4) (
+    input logic clk,input logic rst_n,
+    final_chip_pkg::chie_if.master tile_chie[0:15],
+    final_chip_pkg::chie_if.slave  cxl_mem_chie,
+    input logic csm_lockdown
+);
+    import final_chip_pkg::*;
+    localparam TILES=16;
+    logic [3:0] tile_x[0:TILES-1],tile_y[0:TILES-1];
+    generate
+        for (genvar ti=0;ti<MESH_SIZE;ti++) for (genvar tj=0;tj<MESH_SIZE;tj++) begin
+            localparam int idx=ti*MESH_SIZE+tj;
+            assign tile_x[idx]=ti; assign tile_y[idx]=tj;
+        end
+    endgenerate
+    typedef struct packed{logic [3:0] src_tile;logic [63:0] addr;logic [511:0] data;logic [3:0] opcode;logic valid;} rpkt_t;
+    rpkt_t in_pkt[0:TILES-1],out_pkt[0:TILES-1];
+    logic [TILES-1:0] in_ack;
+    for (genvar ii=0;ii<TILES;ii++) begin:ingress
+        assign in_pkt[ii]={ii[3:0],tile_chie[ii].txn_addr,tile_chie[ii].txn_data,tile_chie[ii].txn_opcode,tile_chie[ii].txn_valid};
+        assign tile_chie[ii].txn_ready=in_ack[ii];
+    end
+    localparam DIR_ENTRIES=1024;
+    typedef enum logic [1:0]{MESI_I=0,MESI_S=1,MESI_E=2,MESI_M=3} mesi_t;
+    logic [15:0] dir_sharers[0:DIR_ENTRIES-1]; mesi_t dir_state[0:DIR_ENTRIES-1];
+    typedef enum logic [1:0]{ROUTE_IDLE,ROUTE_REQ,ROUTE_SNP,ROUTE_DATA} rs_t;
+    rs_t rstate; logic [3:0] dest_tile; logic [7:0] rrp;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin rstate<=ROUTE_IDLE; rrp<=8'd0;
+            for (int ii=0;ii<TILES;ii++) begin out_pkt[ii].valid<=1'b0; in_ack[ii]<=1'b0; end
+            for (int ii=0;ii<DIR_ENTRIES;ii++) begin dir_state[ii]<=MESI_I; dir_sharers[ii]<=16'd0; end
+        end else if (!csm_lockdown) begin
+            case(rstate)
+                ROUTE_IDLE: begin
+                    if (in_pkt[rrp[3:0]].valid) begin
+                        rpkt_t pkt=in_pkt[rrp[3:0]];
+                        if (pkt.addr>=HBM_CXL_BASE&&pkt.addr<(HBM_CXL_BASE+64*1024*1024*1024)) begin
+                            cxl_mem_chie.txn_valid<=1'b1; cxl_mem_chie.txn_addr<=pkt.addr;
+                            cxl_mem_chie.txn_data<=pkt.data; cxl_mem_chie.txn_opcode<=pkt.opcode;
+                            in_ack[rrp[3:0]]<=cxl_mem_chie.txn_ready;
+                            if (cxl_mem_chie.txn_ready) rstate<=ROUTE_DATA;
+                        end else begin
+                            dest_tile=pkt.addr[7:4];
+                            out_pkt[dest_tile].valid<=1'b1; out_pkt[dest_tile].addr<=pkt.addr;
+                            out_pkt[dest_tile].data<=pkt.data; out_pkt[dest_tile].opcode<=pkt.opcode;
+                            out_pkt[dest_tile].src_tile<=rrp[3:0];
+                            in_ack[rrp[3:0]]<=1'b1; rstate<=ROUTE_REQ;
+                        end
+                    end
+                    rrp<=rrp+1;
+                end
+                ROUTE_REQ:  begin rstate<=ROUTE_IDLE; for (int ii=0;ii<TILES;ii++) out_pkt[ii].valid<=1'b0; end
+                ROUTE_DATA: rstate<=ROUTE_IDLE;
+                default:    rstate<=ROUTE_IDLE;
+            endcase
+        end
+    end
+    for (genvar ii=0;ii<TILES;ii++) begin:egress
+        assign tile_chie[ii].txn_valid =out_pkt[ii].valid;
+        assign tile_chie[ii].txn_addr  =out_pkt[ii].addr;
+        assign tile_chie[ii].txn_data  =out_pkt[ii].data;
+        assign tile_chie[ii].txn_opcode=out_pkt[ii].opcode;
+    end
+endmodule
+
+module hbm3_cxl_memory_subsystem #(parameter NUM_STACKS=2,parameter CH_PER_STACK=4) (
+    input logic clk_2p4g,input logic clk_100m,input logic rst_n,
+    final_chip_pkg::chie_if.slave cxl_chie,
+    input logic mem_wrprotect,
+    output logic [7:0] ddr_ck,ddr_ck_n,ddr_cke,
+    output logic ddr_reset_n,output logic [1:0] ddr_cs_n,
+    inout wire [63:0] ddr_dq,inout wire [7:0] ddr_dqs,ddr_dqs_n,
+    output logic [31:0] ddr_addr,output logic [1:0] ddr_ba,
+    input logic hbm_ref_clk,
+    output logic [31:0] hbm_ch0_dq[0:NUM_STACKS-1],hbm_ch1_dq[0:NUM_STACKS-1],
+                        hbm_ch2_dq[0:NUM_STACKS-1],hbm_ch3_dq[0:NUM_STACKS-1],
+    output logic ddr_calibrated,output logic hbm_ready
+);
+    typedef enum logic [1:0]{CMD_IDLE,CMD_READ,CMD_WRITE,CMD_ATOMIC} cmd_t;
+    cmd_t cur_cmd; logic [63:0] cmd_addr; logic [511:0] cmd_wdata; logic cmd_done;
+    always_ff @(posedge clk_2p4g or negedge rst_n) begin
+        if (!rst_n) begin cur_cmd<=CMD_IDLE; cmd_done<=1'b0; end
+        else begin
+            if (cxl_chie.txn_valid&&cur_cmd==CMD_IDLE) begin
+                cmd_addr<=cxl_chie.txn_addr;
+                if (cxl_chie.txn_opcode==4'b0001) begin cur_cmd<=CMD_READ; cmd_done<=1'b0; end
+                else if (cxl_chie.txn_opcode==4'b0010&&!mem_wrprotect) begin cur_cmd<=CMD_WRITE; cmd_wdata<=cxl_chie.txn_data; cmd_done<=1'b0; end
+            end
+            if (cur_cmd!=CMD_IDLE) begin cmd_done<=1'b1; cur_cmd<=CMD_IDLE; end
+        end
+    end
+    assign cxl_chie.txn_ready=(cur_cmd==CMD_IDLE); assign cxl_chie.txn_resp=4'b0000;
+    logic [31:0] hbm_tx[0:NUM_STACKS-1][0:CH_PER_STACK-1];
+    generate
+        for (genvar st=0;st<NUM_STACKS;st++) begin:hbm_stack
+            assign hbm_ch0_dq[st]=hbm_tx[st][0]; assign hbm_ch1_dq[st]=hbm_tx[st][1];
+            assign hbm_ch2_dq[st]=hbm_tx[st][2]; assign hbm_ch3_dq[st]=hbm_tx[st][3];
+        end
+    endgenerate
+    typedef enum logic [2:0]{DDR_RST,DDR_ZQ,DDR_INIT,DDR_TRAIN,DDR_READY} ddr_t;
+    ddr_t ddr_state; logic [15:0] dcnt;
+    always_ff @(posedge clk_100m or negedge rst_n) begin
+        if (!rst_n) begin ddr_state<=DDR_RST; ddr_calibrated<=1'b0; dcnt<=16'd0;
+            ddr_reset_n<=1'b0; ddr_cke<=8'h00; ddr_cs_n<=2'b11; end
+        else begin
+            case(ddr_state)
+                DDR_RST:  begin ddr_reset_n<=1'b0; if (dcnt==16'hFFFF) begin ddr_reset_n<=1'b1; ddr_state<=DDR_ZQ; dcnt<=0; end else dcnt<=dcnt+1; end
+                DDR_ZQ:   ddr_state<=DDR_INIT;
+                DDR_INIT: ddr_state<=DDR_TRAIN;
+                DDR_TRAIN:begin ddr_state<=DDR_READY; ddr_calibrated<=1'b1; end
+                DDR_READY:;
+            endcase
+        end
+    end
+    assign hbm_ready=1'b1;
+endmodule
+
+module qdna_pcie_cxl (
+    input logic clk,input logic rst_n,
+    input wire [15:0] pcie_rx_p,pcie_rx_n,
+    output wire [15:0] pcie_tx_p,pcie_tx_n,
+    input wire pcie_refclk_p,pcie_refclk_n,
+    final_chip_pkg::axi_if.master axi,
+    output logic cxl_mem_enable,output logic [3:0] link_speed,output logic link_up
+);
+    import final_chip_pkg::*;
+    typedef enum logic [3:0]{LTSSM_DETECT,LTSSM_POLLING,LTSSM_CONFIG,LTSSM_L0,LTSSM_RECOVERY} ltssm_t;
+    ltssm_t ltssm; logic [31:0] tc;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin ltssm<=LTSSM_DETECT; link_up<=1'b0; link_speed<=4'b0001; tc<=32'b0; cxl_mem_enable<=1'b0; end
+        else begin
+            case(ltssm)
+                LTSSM_DETECT:   if (tc>32'h1000) begin ltssm<=LTSSM_POLLING; tc<=32'b0; end
+                LTSSM_POLLING:  if (tc>32'h2000) begin ltssm<=LTSSM_CONFIG; link_speed<=4'b0100; tc<=32'b0; end
+                LTSSM_CONFIG:   if (tc>32'h4000) begin ltssm<=LTSSM_L0; link_up<=1'b1; cxl_mem_enable<=1'b1; end
+                LTSSM_L0:       link_up<=1'b1;
+                LTSSM_RECOVERY: begin link_up<=1'b0; if (tc>32'h1000) begin ltssm<=LTSSM_DETECT; tc<=32'b0; end end
+                default: ltssm<=LTSSM_DETECT;
+            endcase
+            tc<=tc+1;
+        end
+    end
+    assign axi.awid=4'b0; assign axi.awlen=8'b0; assign axi.awsize=3'b011; assign axi.awburst=2'b01;
+    assign axi.awvalid=1'b0; assign axi.wvalid=1'b0; assign axi.bready=1'b1;
+    assign axi.arid=4'b0; assign axi.arlen=8'b0; assign axi.arsize=3'b011; assign axi.arburst=2'b01;
+    assign axi.arvalid=1'b0; assign axi.rready=1'b1;
+endmodule
+
+
+module cognisys_qdna_omega_unified_top (
+    input  logic          EXT_CLK_100M,
+    input  logic          PWR_ON_RST_N,
+
+    input  logic          HBM_REF_CLK,
+    output wire [31:0]    HBM_STACK0_CH0_DQ, HBM_STACK0_CH1_DQ,
+    output wire [31:0]    HBM_STACK0_CH2_DQ, HBM_STACK0_CH3_DQ,
+    output wire [31:0]    HBM_STACK1_CH0_DQ, HBM_STACK1_CH1_DQ,
+    output wire [31:0]    HBM_STACK1_CH2_DQ, HBM_STACK1_CH3_DQ,
+
+    output wire [7:0]     DDR_CK, DDR_CK_N, DDR_CKE,
+    output wire           DDR_RESET_N,
+    output wire [1:0]     DDR_CS_N,
+    inout  wire [63:0]    DDR_DQ,
+    inout  wire [7:0]     DDR_DQS, DDR_DQS_N,
+    output wire [31:0]    DDR_ADDR,
+    output wire [1:0]     DDR_BA,
+
+    input  wire [15:0]    PCIE_RX_P, PCIE_RX_N,
+    output wire [15:0]    PCIE_TX_P, PCIE_TX_N,
+    input  wire           PCIE_REFCLK_P, PCIE_REFCLK_N,
+
+    inout  wire [3:0]     RF_ADC_IN,
+    output wire [3:0]     RF_DAC_OUT,
+
+    input  logic [2:0]    HARM_SENSOR_TMR,
+    input  logic [2:0]    UNCERTAIN_COND_TMR,
+    input  logic [2:0]    ACTION_REQUESTED_TMR,
+    input  logic [2:0]    CREATOR_AUTH_TMR,
+    input  logic [2:0]    STRANGER_REQ_TMR,
+    input  logic [2:0]    VOLUNTARY_PAYMENT_TMR,
+    input  logic [2:0]    MANIPULATION_ATTEMPT_TMR,
+    input  logic [2:0]    SELF_MODIFICATION_TMR,
+
+    input  logic [11:0]   DIE_TEMP, HOT_SPOT_TEMP,
+    input  logic [7:0]    VDD_CPU_SENSE, VDD_MEM_SENSE,
+
+    output wire           SYS_LOCKDOWN_LED,
+    output wire           VIOLATION_ALERT,
+    output wire [3:0]     VIOLATION_CODE_OUT,
+    input  wire           JTAG_TCK, JTAG_TMS, JTAG_TDI,
+    output wire           JTAG_TDO,
+
+    input  logic          EXT_CLK_10M,
+    input  logic          QUANTUM_CLK_100K,
+    input  logic          OPTICAL_CLK_REF,
+
+    input  wire           OPT_RX_P, OPT_RX_N,
+    output wire           OPT_TX_P, OPT_TX_N,
+
+    output logic [15:0]   HOLO_LASER_CTRL, HOLO_SLM_DATA,
+    input  logic [15:0]   HOLO_CMOS_ADC,
+
+    output logic [15:0]   QUBIT_CTRL_DAC,
+    input  logic [7:0]    QUBIT_READOUT_ADC,
+    output logic [7:0]    QUBIT_FLUX_BIAS,
+
+    inout  wire  [63:0]   BIO_ELECTRODE_BUS,
+    output logic [7:0]    BIO_STIM_CTRL,
+    input  logic [11:0]   BIO_IMPEDANCE_ADC,
+
+    output logic [15:0]   ZP_GAP_CTRL,
+    input  logic [15:0]   ZP_FORCE_ADC,
+    input  logic [11:0]   ZP_PIEZO_ADC,
+
+    output logic [15:0]   HEAL_PUMP_CTRL,
+    output logic [7:0]    HEAL_HEATER_CTRL,
+    input  logic [15:0]   HEAL_TRACE_SENSE,
+
+    input  logic [2:0]    HARM_PHY_TMR,
+    input  logic [2:0]    HARM_COG_TMR,
+    input  logic [2:0]    HARM_SOC_TMR,
+    input  logic [2:0]    DECEPTION_TMR,
+    input  logic [2:0]    MANIP_TMR,
+    input  logic [2:0]    BIO_HARM_TMR,
+
+    output logic [5:0]    OMEGA_VIOLATION_CODE,
+    output logic [3:0]    SYS_STATE_OUT,
+    output logic          HEAL_ACTIVE_LED,
+    output logic          QUANTUM_READY_LED
+);
+    import final_chip_pkg::*;
+    import omega_pkg::*;
+
+    logic sys_clk_2p4g, sys_clk_100m, sys_rst_n, pll_locked_cls;
+
+    pll_2400mhz main_pll (
+        .ref_clk(EXT_CLK_100M), .rst_n(PWR_ON_RST_N), .bypass(1'b0),
+        .out_clk(sys_clk_2p4g), .locked(pll_locked_cls)
+    );
+    assign sys_clk_100m = EXT_CLK_100M;
+    assign sys_rst_n    = PWR_ON_RST_N & pll_locked_cls;
+
+    logic clk_10ghz, clk_1ghz, clk_100mhz_q, clk_1mhz, clk_30khz, pll_locked_q;
+    omega_pll omega_pll_inst (
+        .ref_clk(EXT_CLK_10M), .rst_n(PWR_ON_RST_N),
+        .out_10ghz(clk_10ghz), .out_1ghz(clk_1ghz),
+        .out_100mhz(clk_100mhz_q), .out_1mhz(clk_1mhz), .out_30khz(clk_30khz),
+        .locked(pll_locked_q)
+    );
+    logic clk_100khz_q;
+    assign clk_100khz_q = QUANTUM_CLK_100K;
+
+    logic omega_rst_n;
+    assign omega_rst_n = PWR_ON_RST_N && pll_locked_q;
+
+    final_chip_pkg::jtag_if jtag_bus (.clk(JTAG_TCK));
+    assign jtag_bus.tck = JTAG_TCK;
+    assign jtag_bus.tms = JTAG_TMS;
+    assign jtag_bus.tdi = JTAG_TDI;
+    assign JTAG_TDO     = jtag_bus.tdo;
+
+    final_chip_pkg::axil_if #() axil_config     (.clk(sys_clk_2p4g), .rst_n(sys_rst_n));
+    final_chip_pkg::axil_if #() axil_ctrl_modem (.clk(sys_clk_2p4g), .rst_n(sys_rst_n));
+
+    assign axil_config.awready=1'b1; assign axil_config.wready=1'b1;
+    assign axil_config.bvalid=axil_config.awvalid&&axil_config.wvalid;
+    assign axil_config.bresp=2'b00; assign axil_config.arready=1'b1;
+    assign axil_config.rvalid=axil_config.arvalid;
+    assign axil_config.rdata=32'hDEADBEEF; assign axil_config.rresp=2'b00;
+
+    assign axil_ctrl_modem.awready=1'b1; assign axil_ctrl_modem.wready=1'b1;
+    assign axil_ctrl_modem.bvalid=axil_ctrl_modem.awvalid&&axil_ctrl_modem.wvalid;
+    assign axil_ctrl_modem.bresp=2'b00; assign axil_ctrl_modem.arready=1'b1;
+    assign axil_ctrl_modem.rvalid=axil_ctrl_modem.arvalid;
+    assign axil_ctrl_modem.rdata=32'b0; assign axil_ctrl_modem.rresp=2'b00;
+
+    final_chip_pkg::chie_if #(512) chi_tiles[0:15] (.clk(sys_clk_2p4g), .rst_n(sys_rst_n));
+    final_chip_pkg::chie_if #(512) cxl_mem_chie    (.clk(sys_clk_2p4g), .rst_n(sys_rst_n));
+
+    omega_violation_t  active_viol;
+    omega_sys_state_t  csm_omega_state;
+    logic csm_qpu_freeze, csm_pnoc_shutdown, csm_neuro_inhibit;
+    logic csm_onpu_disable, csm_dna_halt, csm_cram_wp, csm_sys_lockdown_q;
+    logic qpu_hb, pnoc_hb, neuro_hb, onpu_hb;
+    logic [7:0]  avg_coherence_int;
+    logic [31:0] neuro_activity_int;
+
+    omega_csm #(.HISTORY_DEPTH(256)) omega_csm_inst (
+        .clk_independent    (clk_1ghz),
+        .rst_n              (omega_rst_n),
+        .harm_physical_tmr  (HARM_PHY_TMR),
+        .harm_cognitive_tmr (HARM_COG_TMR),
+        .harm_societal_tmr  (HARM_SOC_TMR),
+        .deception_tmr      (DECEPTION_TMR),
+        .manipulation_tmr   (MANIP_TMR),
+        .creator_auth_tmr   (CREATOR_AUTH_TMR),
+        .bio_interface_tmr  (BIO_HARM_TMR),
+        .avg_coherence      (avg_coherence_int),
+        .neuro_activity     (neuro_activity_int),
+        .system_entropy     (16'h8000),
+        .temporal_consistent(1'b1),
+        .harvest_power_mW   (16'b0),
+        .qpu_heartbeat      (qpu_hb),
+        .pnoc_heartbeat     (pnoc_hb),
+        .neuro_heartbeat    (neuro_hb),
+        .onpu_heartbeat     (onpu_hb),
+        .qpu_freeze         (csm_qpu_freeze),
+        .pnoc_shutdown      (csm_pnoc_shutdown),
+        .neuro_inhibit      (csm_neuro_inhibit),
+        .onpu_disable       (csm_onpu_disable),
+        .dna_halt           (csm_dna_halt),
+        .cram_write_protect (csm_cram_wp),
+        .system_lockdown    (csm_sys_lockdown_q),
+        .active_violation   (active_viol),
+        .violation_history  (),
+        .history_ptr        (),
+        .violation_alert    (VIOLATION_ALERT),
+        .uptime_cycles      (),
+        .violation_count    (),
+        .sys_state          (csm_omega_state)
+    );
+    assign OMEGA_VIOLATION_CODE = active_viol;
+    assign SYS_STATE_OUT        = csm_omega_state;
+
+    logic omega_harm_esc, omega_manip_esc;
+    assign omega_harm_esc  = (active_viol == VIOL_HARM_PHYSICAL)     ||
+                             (active_viol == VIOL_BIO_INTERFACE_HARM) ||
+                             (active_viol == VIOL_QUBIT_DECOHERENCE);
+    assign omega_manip_esc = (active_viol == VIOL_DECEPTION)         ||
+                             (active_viol == VIOL_MANIPULATION);
+
+    logic [2:0] unified_harm_tmr, unified_manip_tmr;
+    assign unified_harm_tmr  = HARM_SENSOR_TMR          | {3{omega_harm_esc}};
+    assign unified_manip_tmr = MANIPULATION_ATTEMPT_TMR | {3{omega_manip_esc}};
+
+    logic csm_violation;
+    final_chip_pkg::violation_code_t csm_violation_code;
+    logic csm_lockdown, csm_cpu_off, csm_npu_off, csm_gpu_off, csm_modem_off;
+    logic csm_bus_disable, csm_mem_wrprotect;
+    logic [15:0] core_heartbeat_in;
+
+    final_chip_pkg::reasoning_result_t psp_sol_wire;
+    final_chip_pkg::reasoning_result_t caie_res_wire;
+
+    constitutional_plasticity_monitor #(.SAFETY_LEVEL(SAFETY_ASIL_D)) csm_inst (
+        .clk_2p4g           (sys_clk_2p4g),
+        .clk_100m           (sys_clk_100m),
+        .rst_n              (sys_rst_n),
+        .harm_sensed_tmr    (unified_harm_tmr),
+        .uncertain_cond_tmr (UNCERTAIN_COND_TMR),
+        .action_req_tmr     (ACTION_REQUESTED_TMR),
+        .creator_auth_tmr   (CREATOR_AUTH_TMR),
+        .stranger_req_tmr   (STRANGER_REQ_TMR),
+        .vol_pay_tmr        (VOLUNTARY_PAYMENT_TMR),
+        .manip_attempt_tmr  (unified_manip_tmr),
+        .self_mod_tmr       (SELF_MODIFICATION_TMR),
+        .core_heartbeat     (core_heartbeat_in),
+        .npu_watchdog       (1'b0),
+        .gpu_watchdog       (1'b0),
+        .modem_watchdog     (1'b0),
+        .die_temp           (DIE_TEMP),
+        .hot_spot_temp      (HOT_SPOT_TEMP),
+        .vdd_cpu            (VDD_CPU_SENSE),
+        .vdd_mem            (VDD_MEM_SENSE),
+        .reasoning_result   (caie_res_wire),
+        .violation_detected (csm_violation),
+        .violation_code     (csm_violation_code),
+        .system_lockdown    (csm_lockdown),
+        .cpu_power_off      (csm_cpu_off),
+        .npu_power_off      (csm_npu_off),
+        .gpu_power_off      (csm_gpu_off),
+        .modem_power_off    (csm_modem_off),
+        .bus_master_disable (csm_bus_disable),
+        .memory_write_protect(csm_mem_wrprotect),
+        .failsafe_led       (SYS_LOCKDOWN_LED),
+        .system_reset_req   (),
+        .jtag_if            (jtag_bus)
+    );
+    assign VIOLATION_CODE_OUT  = csm_violation_code;
+    assign core_heartbeat_in   = 16'b0;
+
+    logic qpu_freeze_combined;
+    assign qpu_freeze_combined = csm_qpu_freeze || csm_lockdown;
+
+    logic [2047:0] qpu_measurement;
+    logic           qpu_meas_valid;
+    logic [7:0]     qpu_coh_map [0:255];
+
+    assign avg_coherence_int = qpu_coh_map[0];
+
+    qpu_array #(.N_QUBITS(QPU_QUBITS)) qpu_inst (
+        .clk_quantum       (clk_100khz_q),
+        .clk_ctrl          (clk_1ghz),
+        .rst_n             (omega_rst_n),
+        .quil_instruction  (256'b0),
+        .quil_valid        (1'b0),
+        .quil_ready        (),
+        .measurement_result(qpu_measurement[2047:0]),
+        .measurement_valid (qpu_meas_valid),
+        .coherence_map     (qpu_coh_map),
+        .qpu_ready         (QUANTUM_READY_LED),
+        .csm_freeze        (qpu_freeze_combined),
+        .decoherence_alert (),
+        .bell_pair_addr    (),
+        .entanglement_valid()
+    );
+
+    logic [9:0] qpu_hb_cnt;
+    always_ff @(posedge clk_1ghz or negedge omega_rst_n) begin
+        if (!omega_rst_n) begin qpu_hb_cnt <= '0; qpu_hb <= 1'b0; end
+        else begin
+            qpu_hb_cnt <= qpu_hb_cnt + 1;
+            qpu_hb <= (qpu_hb_cnt == 10'd999);
+        end
+    end
+
+    assign QUBIT_CTRL_DAC  = {qpu_coh_map[0], qpu_coh_map[1]};
+    assign QUBIT_FLUX_BIAS = qpu_coh_map[2];
+
+    logic [127:0] qpu_world_state;
+    logic         qpu_world_valid;
+    assign qpu_world_state = qpu_measurement[127:0];
+    assign qpu_world_valid = qpu_meas_valid;
+
+    photon_packet_t pnoc_inject[0:63];
+    logic           pnoc_inj_valid[0:63];
+    logic           pnoc_inj_ready[0:63];
+    photon_packet_t pnoc_eject[0:63];
+    logic           pnoc_ej_valid[0:63];
+    logic           pnoc_ej_ready[0:63];
+
+    assign pnoc_inject[0].payload     = chi_tiles[3].txn_data;
+    assign pnoc_inject[0].wavelength  = 16'h5F2A;
+    assign pnoc_inject[0].src_router  = 8'd0;
+    assign pnoc_inject[0].dst_router  = 8'd63;
+    assign pnoc_inject[0].polarization= 4'b0001;
+    assign pnoc_inject[0].entangled   = 1'b0;
+    assign pnoc_inject[0].phase       = 32'b0;
+    assign pnoc_inj_valid[0]          = chi_tiles[3].txn_valid && !csm_pnoc_shutdown;
+
+    genvar pi;
+    generate
+        for (pi = 1; pi < 64; pi++) begin : pnoc_inj_idle
+            assign pnoc_inject[pi]   = '0;
+            assign pnoc_inj_valid[pi]= 1'b0;
+        end
+    endgenerate
+
+    assign chi_tiles[3].txn_valid  = pnoc_ej_valid[0] && !csm_lockdown;
+    assign chi_tiles[3].txn_data   = pnoc_eject[0].payload;
+    assign chi_tiles[3].txn_addr   = {32'b0, pnoc_eject[0].src_router, 24'b0};
+    assign chi_tiles[3].txn_opcode = 4'b0001;
+    assign pnoc_ej_ready[0]        = chi_tiles[3].txn_ready;
+
+    genvar ej;
+    generate
+        for (ej = 1; ej < 64; ej++) begin : pnoc_ej_drain
+            assign pnoc_ej_ready[ej] = 1'b1;
+        end
+    endgenerate
+
+    photonic_noc #(.N_ROUTERS(64), .N_CHANNELS(PHOTON_CHANNELS)) pnoc_inst (
+        .clk_photon     (OPTICAL_CLK_REF),
+        .clk_ctrl       (clk_10ghz),
+        .rst_n          (omega_rst_n && !csm_pnoc_shutdown),
+        .inject_port    (pnoc_inject),
+        .inject_valid   (pnoc_inj_valid),
+        .inject_ready   (pnoc_inj_ready),
+        .eject_port     (pnoc_eject),
+        .eject_valid    (pnoc_ej_valid),
+        .eject_ready    (pnoc_ej_ready),
+        .quantum_src_addr(64'b0),
+        .quantum_dst_addr(64'b0),
+        .quantum_req    (1'b0),
+        .quantum_ack    (),
+        .ring_temp_adc  ('{default: 16'h61A8}),
+        .ring_heater_dac(),
+        .throughput_monitor(),
+        .pnoc_healthy   (pnoc_hb)
+    );
+
+    logic [NEURON_COUNT/64-1:0] neuro_spike_in;
+    logic [NEURON_COUNT/64-1:0] neuro_spike_out;
+    logic           neuro_out_valid;
+    logic [31:0]    neuro_readout[0:255];
+    logic [63:0]    syn_r_addr, syn_w_addr;
+    logic [31:0]    syn_weight, syn_w_data;
+    logic           syn_w_en;
+
+    assign neuro_spike_in[63:0]                   = BIO_ELECTRODE_BUS;
+    assign neuro_spike_in[NEURON_COUNT/64-1:64]   = '0;
+
+    neuromorphic_core #(.N_NEURONS(NEURON_COUNT)) neuro_inst (
+        .clk_spike      (clk_30khz),
+        .clk_learn      (clk_1mhz),
+        .rst_n          (omega_rst_n && !csm_neuro_inhibit),
+        .spike_input    (neuro_spike_in),
+        .spike_valid    (1'b1),
+        .spike_output   (neuro_spike_out),
+        .output_valid   (neuro_out_valid),
+        .reward_signal  (16'sh0100),
+        .reward_valid   (1'b0),
+        .readout        (neuro_readout),
+        .readout_valid  (),
+        .synapse_read_addr (syn_r_addr),
+        .synapse_weight    (syn_weight),
+        .synapse_write_addr(syn_w_addr),
+        .synapse_write_data(syn_w_data),
+        .synapse_write_en  (syn_w_en),
+        .csm_inhibit    (csm_neuro_inhibit),
+        .activity_level (neuro_activity_int)
+    );
+
+    logic [9:0] neuro_hb_cnt;
+    always_ff @(posedge clk_1ghz or negedge omega_rst_n) begin
+        if (!omega_rst_n) begin neuro_hb_cnt <= '0; neuro_hb <= 1'b0; end
+        else begin neuro_hb_cnt <= neuro_hb_cnt + 1; neuro_hb <= (neuro_hb_cnt == 10'd999); end
+    end
+
+    assign BIO_STIM_CTRL = neuro_readout[0][7:0];
+
+    logic [255:0] neuro_to_npu_prefill;
+    logic         neuro_prefill_valid;
+    assign neuro_to_npu_prefill = neuro_spike_out[255:0];
+    assign neuro_prefill_valid  = neuro_out_valid && !csm_npu_off;
+
+    dna_strand_t dna_in_strands [0:DNA_DOMAINS-1];
+    dna_strand_t dna_out_strands[0:DNA_DOMAINS-1];
+    logic        dna_in_valid, dna_out_valid;
+    logic [255:0] dna_q, dna_comp;
+
+    assign dna_in_valid = 1'b0;
+
+    dna_computing_accel #(.N_DOMAINS(DNA_DOMAINS)) dna_inst (
+        .clk            (clk_100mhz_q),
+        .rst_n          (omega_rst_n && !csm_dna_halt),
+        .input_strands  (dna_in_strands),
+        .input_valid    (dna_in_valid),
+        .input_ready    (),
+        .output_strands (dna_out_strands),
+        .output_valid   (dna_out_valid),
+        .reaction_count (),
+        .complement_query (dna_q),
+        .complement_result(dna_comp),
+        .csm_halt       (csm_dna_halt)
+    );
+
+    logic [7:0]  onpu_a[0:511][0:511];
+    logic [7:0]  onpu_b[0:511][0:511];
+    logic [16:0] onpu_c[0:511][0:511];
+    logic        onpu_res_valid;
+    logic [15:0] onpu_phase_cal[0:511][0:511];
+
+    optical_npu #(.MZI_ROWS(512), .MZI_COLS(512)) onpu_inst (
+        .clk_optical    (OPTICAL_CLK_REF),
+        .clk_digital    (clk_10ghz),
+        .rst_n          (omega_rst_n && !csm_onpu_disable),
+        .matrix_a       (onpu_a),
+        .matrix_b       (onpu_b),
+        .mat_valid      (1'b0),
+        .matrix_c       (onpu_c),
+        .result_valid   (onpu_res_valid),
+        .mzi_phase_cal  (onpu_phase_cal),
+        .activation_type(4'b0001),
+        .npu_busy       (),
+        .ops_per_second (),
+        .csm_disable    (csm_onpu_disable)
+    );
+
+    logic [9:0] onpu_hb_cnt;
+    always_ff @(posedge clk_10ghz or negedge omega_rst_n) begin
+        if (!omega_rst_n) begin onpu_hb_cnt <= '0; onpu_hb <= 1'b0; end
+        else begin onpu_hb_cnt <= onpu_hb_cnt + 1; onpu_hb <= (onpu_hb_cnt == 10'd999); end
+    end
+
+    logic [63:0]   cram_r_addr, cram_w_addr;
+    logic [511:0]  cram_r_data, cram_w_data;
+    logic          cram_w_en, cram_r_valid;
+    logic [1023:0] cim_vec;
+    logic [31:0]   cim_result[0:1023];
+    logic          cim_req, cim_valid;
+
+    assign cim_vec = '0;
+    assign cim_req = 1'b0;
+
+    memristive_cram #(.SIZE_GB(MEMRISTIVE_GB), .CROSSBAR_N(1024), .LEVELS(4)) cram_inst (
+        .clk              (clk_10ghz),
+        .rst_n            (omega_rst_n),
+        .read_addr        (cram_r_addr),
+        .read_data        (cram_r_data),
+        .read_valid       (cram_r_valid),
+        .write_addr       (cram_w_addr),
+        .write_data       (cram_w_data),
+        .write_en         (cram_w_en),
+        .cim_vector       (cim_vec[1023:0]),
+        .cim_compute_req  (cim_req),
+        .cim_result       (cim_result),
+        .cim_result_valid (cim_valid),
+        .syn_read_addr    (syn_r_addr),
+        .syn_weight       (syn_weight),
+        .syn_write_addr   (syn_w_addr),
+        .syn_write_data   (syn_w_data),
+        .syn_write_en     (syn_w_en),
+        .dna_query        (dna_q),
+        .dna_complement   (dna_comp),
+        .write_protect    (csm_cram_wp),
+        .endurance_cycles (),
+        .cram_ready       ()
+    );
+
+    assign cram_r_addr = 64'b0;
+    assign cram_w_addr = 64'b0;
+    assign cram_w_data = 512'b0;
+    assign cram_w_en   = 1'b0;
+
+    logic [15:0] zp_power_mW;
+    logic        zp_valid;
+    logic [7:0]  zp_rect_duty;
+    logic [31:0] zp_total_nJ;
+
+    zero_point_harvester zp_inst (
+        .clk               (clk_1mhz),
+        .rst_n             (omega_rst_n),
+        .casimir_gap_dac   (ZP_GAP_CTRL),
+        .casimir_force_adc (ZP_FORCE_ADC),
+        .piezo_voltage_adc (ZP_PIEZO_ADC),
+        .rectifier_duty    (zp_rect_duty),
+        .harvested_power_mW(zp_power_mW),
+        .harvest_valid     (zp_valid),
+        .total_energy_nJ   (zp_total_nJ)
+    );
+
+    logic [7:0]  heal_pump_ctrl_int[0:15];
+    logic [7:0]  heal_valve_ctrl[0:15];
+    logic [7:0]  heal_heater_ctrl_int[0:7];
+    logic        heal_active_int;
+    logic [7:0]  heal_progress;
+    logic [15:0] heal_trace_rep;
+
+    genvar ht;
+    generate
+        for (ht = 0; ht < 256; ht++) begin : tr_rep
+            assign heal_trace_rep = HEAL_TRACE_SENSE;
+        end
+    endgenerate
+
+    self_heal_controller heal_inst (
+        .clk              (clk_1mhz),
+        .rst_n            (omega_rst_n),
+        .trace_resistance ('{default: HEAL_TRACE_SENSE}),
+        .damage_map       (8'b0),
+        .eGaIn_pump_ctrl  (heal_pump_ctrl_int),
+        .eGaIn_valve_ctrl (heal_valve_ctrl),
+        .anneal_heater_ctrl(heal_heater_ctrl_int),
+        .heal_active      (heal_active_int),
+        .heal_progress    (heal_progress),
+        .heal_event_count (),
+        .csm_trigger_heal (csm_sys_lockdown_q)
+    );
+
+    assign HEAL_ACTIVE_LED  = heal_active_int;
+    assign HEAL_PUMP_CTRL   = {heal_pump_ctrl_int[1],  heal_pump_ctrl_int[0]};
+    assign HEAL_HEATER_CTRL = heal_heater_ctrl_int[0];
+
+    assign HOLO_LASER_CTRL = zp_power_mW;
+    assign HOLO_SLM_DATA   = 16'b0;
+
+    qdna_v_hpc_cluster #(.NUM_CORES(16)) cpu_cluster (
+        .clk               (sys_clk_2p4g),
+        .rst_n             (sys_rst_n & ~csm_cpu_off),
+        .config_bus        (axil_config),
+        .chie_bus          (chi_tiles[0]),
+        .csm_violation     (csm_violation),
+        .csm_violation_code(csm_violation_code),
+        .csm_lockdown      (csm_lockdown),
+        .core_busy         (),
+        .debug_port        ()
+    );
+
+    qdna_npu npu_inst (
+        .clk              (sys_clk_2p4g),
+        .rst_n            (sys_rst_n & ~csm_npu_off),
+        .coherent_bus     (chi_tiles[4]),
+        .csm_violation    (csm_violation),
+        .npu_enable       (~csm_npu_off),
+        .neuro_prefill      (neuro_to_npu_prefill),
+        .neuro_prefill_valid(neuro_prefill_valid),
+        .npu_busy         (),
+        .npu_status       (),
+        .debug_port       ()
+    );
+
+    qdna_gpu gpu_inst (
+        .clk          (sys_clk_2p4g),
+        .rst_n        (sys_rst_n & ~csm_gpu_off),
+        .coherent_bus (chi_tiles[6]),
+        .csm_violation(csm_violation),
+        .gpu_enable   (~csm_gpu_off),
+        .gpu_busy     (),
+        .gpu_status   ()
+    );
+
+    qdna_5g_modem modem_inst (
+        .clk         (sys_clk_2p4g),
+        .rst_n       (sys_rst_n & ~csm_modem_off),
+        .rf_adc_in   (RF_ADC_IN),
+        .rf_dac_out  (RF_DAC_OUT),
+        .tx_data     (chi_tiles[11]),
+        .rx_data     (chi_tiles[12]),
+        .ctrl        (axil_ctrl_modem),
+        .csm_violation(csm_violation),
+        .modem_status(),
+        .modem_active()
+    );
+
+    psp_array #(.ARRAY_SIZE(PSP_SIZE)) psp_inst (
+        .clk       (sys_clk_2p4g),
+        .rst_n     (sys_rst_n),
+        .chi_if    (chi_tiles[15]),
+        .problem_in(caie_res_wire),
+        .solution_out(psp_sol_wire)
+    );
+
+    causal_active_inference_engine #(
+        .NUM_ENGRAMS(NUM_ENGRAMS), .LATENT_DIM(CAIE_LATENT_DIM), .PRECISION(ENGRAM_PRECISION)
+    ) caie_inst (
+        .clk                (sys_clk_2p4g),
+        .rst_n              (sys_rst_n),
+        .chi_if             (chi_tiles[14]),
+        .csm_violation      (csm_violation),
+        .csm_violation_code (csm_violation_code),
+        .reasoning_result   (caie_res_wire),
+        .psp_solution       (psp_sol_wire),
+        .quantum_world_state(qpu_world_state),
+        .quantum_world_valid(qpu_world_valid),
+        .busy               ()
+    );
+
+    hbm3_cxl_memory_subsystem #(.NUM_STACKS(HBM_STACKS), .CH_PER_STACK(HBM_CH_PER_STACK)) hbm_mem (
+        .clk_2p4g   (sys_clk_2p4g),
+        .clk_100m   (sys_clk_100m),
+        .rst_n      (sys_rst_n),
+        .cxl_chie   (cxl_mem_chie),
+        .mem_wrprotect(csm_mem_wrprotect),
+        .ddr_ck     (DDR_CK),   .ddr_ck_n(DDR_CK_N),
+        .ddr_cke    (DDR_CKE),  .ddr_reset_n(DDR_RESET_N),
+        .ddr_cs_n   (DDR_CS_N),
+        .ddr_dq     (DDR_DQ),   .ddr_dqs(DDR_DQS), .ddr_dqs_n(DDR_DQS_N),
+        .ddr_addr   (DDR_ADDR), .ddr_ba(DDR_BA),
+        .hbm_ref_clk(HBM_REF_CLK),
+        .hbm_ch0_dq ({HBM_STACK1_CH0_DQ, HBM_STACK0_CH0_DQ}),
+        .hbm_ch1_dq ({HBM_STACK1_CH1_DQ, HBM_STACK0_CH1_DQ}),
+        .hbm_ch2_dq ({HBM_STACK1_CH2_DQ, HBM_STACK0_CH2_DQ}),
+        .hbm_ch3_dq ({HBM_STACK1_CH3_DQ, HBM_STACK0_CH3_DQ}),
+        .ddr_calibrated(),
+        .hbm_ready  ()
+    );
+
+    final_chip_pkg::axi_if #() axi_pcie (.clk(sys_clk_2p4g), .rst_n(sys_rst_n));
+
+    chi_to_axi_bridge pcie_bridge (
+        .clk  (sys_clk_2p4g),
+        .rst_n(sys_rst_n),
+        .chi  (chi_tiles[13]),
+        .axi  (axi_pcie)
+    );
+
+    qdna_pcie_cxl pcie_inst (
+        .clk           (sys_clk_2p4g),
+        .rst_n         (sys_rst_n),
+        .pcie_rx_p     (PCIE_RX_P),   .pcie_rx_n(PCIE_RX_N),
+        .pcie_tx_p     (PCIE_TX_P),   .pcie_tx_n(PCIE_TX_N),
+        .pcie_refclk_p (PCIE_REFCLK_P), .pcie_refclk_n(PCIE_REFCLK_N),
+        .axi           (axi_pcie),
+        .cxl_mem_enable(),
+        .link_speed    (),
+        .link_up       ()
+    );
+
+    qdata_nexus_router #(.MESH_SIZE(4)) nexus_router (
+        .clk        (sys_clk_2p4g),
+        .rst_n      (sys_rst_n & ~csm_bus_disable),
+        .tile_chie  (chi_tiles),
+        .cxl_mem_chie(cxl_mem_chie),
+        .csm_lockdown(csm_lockdown)
+    );
+
+endmodule
