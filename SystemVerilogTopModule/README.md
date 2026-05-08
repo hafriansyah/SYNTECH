@@ -13,6 +13,7 @@ Unified System‑on‑Wafer blueprint merging classical (TSMC N3P, 2.4 GHz) an
 ## Repository Structure
 ```
 
+```
 SYNTECH/
 ├── design/
 │   └── COGNISYS-QDNA OMEGA UNIFIED CHIP
@@ -20,7 +21,7 @@ SYNTECH/
 │   ├── LICENSE
 │   ├── README.md
 │   └── WHITEPAPER.md
-
+```
 ```
 
 ## Key Technical Details
