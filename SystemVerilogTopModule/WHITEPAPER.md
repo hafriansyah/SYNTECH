@@ -1,19 +1,19 @@
 # COGNISYS‑QDNA OMEGA UNIFIED WHITEPAPER
 **Epoch 2051 – Unified Classical & Post‑Silicon Heterogeneous Computing Platform**  
-Dokumen Teknis & Arsitektur | Versi 2.0 (Final Top Integration)
+Technical & Architecture Document | Version 2.0 (Final Top Integration)
 
 ---
 
-## Abstrak
+## Abstract
 
-Cognisys‑QDNA Omega Unified adalah platform System‑on‑Wafer (SoW) heterogen yang menyatukan 18,7 miliar transistor CMOS TSMC N3P (domain klasik) dengan 312 miliar transistor ekivalen CNT post‑silikon (domain kuantum/neuromorfik) dalam satu substrat terintegrasi.  
-Arsitekturnya memungkinkan kolaborasi antara 16‑core RISC‑V HPC, GPU 128‑CU, NPU dengan reasoning head, modem 5G, constitutional safety monitor (CSM) ASIL‑D, serta prosesor kuantum 2048‑qubit, photonic network‑on‑chip 1 Pb/s, inti neuromorfik 1‑juta neuron, akselerator komputasi DNA, NPU optik 1 EFLOPS, dan zero‑point energy harvester.
+Cognisys‑QDNA Omega Unified is a heterogeneous System‑on‑Wafer (SoW) platform that unifies 18.7 billion CMOS TSMC N3P transistors (classical domain) with 312 billion CNT post‑silicon equivalent transistors (quantum/neuromorphic domain) within a single integrated substrate.  
+Its architecture enables collaboration between a 16‑core RISC‑V HPC, 128‑CU GPU, NPU with reasoning head, 5G modem, constitutional safety monitor (CSM) ASIL‑D, as well as a 2048‑qubit quantum processor, 1 Pb/s photonic network‑on‑chip, 1‑million neuron neuromorphic core, DNA computing accelerator, 1 EFLOPS optical NPU, and zero‑point energy harvester.
 
-Dokumen ini menjelaskan arsitektur global, tujuan setiap modul, menilai realisme teknologi per 2026, serta menyajikan roadmap bertahap menuju realisasi penuh.
+This document describes the global architecture, the purpose of each module, assesses technological realism as of 2026, and presents a phased roadmap toward full realization.
 
 ---
 
-## Diagram Arsitektur Level Atas
+## Top‑Level Architecture Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -48,225 +48,225 @@ Dokumen ini menjelaskan arsitektur global, tujuan setiap modul, menilai realisme
 
 ---
 
-## Lima Jembatan Integrasi (Integration Bridges)
+## Five Integration Bridges
 
-| Bridge | Dari                    | Ke               | Fungsi |
-|--------|-------------------------|------------------|--------|
-| 1      | Omega CSM               | Classical CSM    | Eskalasi pelanggaran kuantum/bio ke input TMR "harm" dan "manipulasi" klasik |
-| 2      | Classical CSM           | QPU Array        | Lockdown klasik menghasilkan sinyal `qpu_freeze` gabungan, menghentikan semua operasi qubit |
-| 3      | QPU Measurement[127:0]  | CAIE             | Injeksi quantum world state ke dalam mesin inferensi kausal (CAIE) |
-| 4      | Neuro Spike[255:0]      | QDNA NPU         | Aktivitas spiking neuromorfik mengisi prefill row systolic array NPU |
-| 5      | CHI Tile[3] ↔ PNOC      | Photonic NoC     | Injeksi/ejeksi paket fotonik dari/ke mesh koheren klasik untuk komunikasi antardomain |
+| Bridge | From                    | To               | Function |
+|--------|-------------------------|------------------|----------|
+| 1      | Omega CSM               | Classical CSM    | Escalation of quantum/bio violations to classical TMR "harm" and "manipulation" inputs |
+| 2      | Classical CSM           | QPU Array        | Classical lockdown generates a combined `qpu_freeze` signal, halting all qubit operations |
+| 3      | QPU Measurement[127:0]  | CAIE             | Injection of quantum world state into the causal inference engine (CAIE) |
+| 4      | Neuro Spike[255:0]      | QDNA NPU         | Neuromorphic spiking activity fills the prefill row of the NPU systolic array |
+| 5      | CHI Tile[3] ↔ PNOC      | Photonic NoC     | Injection/ejection of photonic packets from/to the classical coherent mesh for cross‑domain communication |
 
 ---
 
-## Deskripsi & Tujuan Fungsional Modul
+## Module Functional Description & Purpose
 
-### Domain Klasik (TSMC N3P, 2.4 GHz)
+### Classical Domain (TSMC N3P, 2.4 GHz)
 
 **QDNA RISC‑V HPC Cluster (16‑core)**  
-16 prosesor RISC‑V dengan instruksi kustom `QD_CUSTOM_OPCODE` untuk akses langsung ke CSM.  
-Berperan sebagai host processor utama, menjalankan OS dan penjadwalan beban kerja.
+16 RISC‑V processors with custom `QD_CUSTOM_OPCODE` instructions for direct CSM access.  
+Serves as the primary host processor, running the OS and workload scheduling.
 
 **QDNA NPU (Neural Processing Unit)**  
-NPU systolic array 256×256 + language model head untuk inferensi Monte Carlo.  
-Menangani beban AI probabilistik dengan epistemic uncertainty.
+256×256 systolic array NPU + language model head for Monte Carlo inference.  
+Handles probabilistic AI workloads with epistemic uncertainty.
 
 **QDNA GPU (128 Compute Units)**  
-GPU multicore dengan pipeline raster‑texture‑writeback.  
-Digunakan untuk rendering, simulasi fisika, atau akselerasi paralel non‑AI.
+Multicore GPU with raster‑texture‑writeback pipeline.  
+Used for rendering, physics simulation, or non‑AI parallel acceleration.
 
 **QDNA 5G Modem**  
-Modem NR FR2 dengan sinkronisasi PSS/SSS, MIB/SIB1, beamforming adaptif.  
-Menyediakan konektivitas wide‑area latensi rendah.
+NR FR2 modem with PSS/SSS synchronization, MIB/SIB1, and adaptive beamforming.  
+Provides low‑latency wide‑area connectivity.
 
 **PSP Array (Spin‑Glass Solver)**  
-Solver Ising 256×256 berbasis annealing perangkat keras.  
-Memecahkan masalah optimasi kombinatorial dan menghasilkan `reasoning_result`.
+256×256 Ising solver based on hardware annealing.  
+Solves combinatorial optimization problems and generates `reasoning_result`.
 
 **CAIE (Causal Active‑Inference Engine)**  
-Mesin inferensi kausal dengan 512 engram dan latent space 128‑dimensi.  
-Menerima world state dari QPU (Bridge 3) dan menghasilkan `reasoning_result` untuk CSM.
+Causal inference engine with 512 engrams and 128‑dimensional latent space.  
+Receives world state from the QPU (Bridge 3) and generates `reasoning_result` for the CSM.
 
 **Classical Constitution Safety Monitor (CSM, ASIL‑D)**  
-Monitor keselamatan konstitusional berbasis TMR, sensor termal/tegangan, dan plastisitas pelanggaran.  
-Dapat memicu lockdown penuh atau degradasi parsial terhadap modul yang melanggar.
+Constitutional safety monitor based on TMR, thermal/voltage sensors, and violation plasticity.  
+Can trigger a full lockdown or partial degradation of offending modules.
 
 **Nexus Router (4×4 CHI Mesh)**  
-Router koheren 16‑tile dengan direktori MESI dan CXL.mem uplink.  
-Menghubungkan seluruh modul klasik dan menyediakan antarmuka ke HBM/DDR.
+16‑tile coherent router with MESI directory and CXL.mem uplink.  
+Interconnects all classical modules and provides the HBM/DDR interface.
 
 **HBM3 CXL Memory Subsystem**  
-Pengontrol memori HBM (2‑stack, 4‑channel) + DDR5/LPDDR5X.  
-Bandwidth 2 TB/s untuk CPU/GPU/NPU.
+HBM memory controller (2‑stack, 4‑channel) + DDR5/LPDDR5X.  
+2 TB/s bandwidth for CPU/GPU/NPU.
 
 **PCIe/CXL 6.0 Interface**  
-Antarmuka PCIe Gen6/CXL 6.0 dengan link training LTSSM.  
-Ekspansi ke node lain atau akselerator eksternal.
+PCIe Gen6/CXL 6.0 interface with LTSSM link training.  
+Expansion to other nodes or external accelerators.
 
 ---
 
-### Domain Kuantum / Post‑Silikon (CNT‑1Å, 12 THz)
+### Quantum / Post‑Silicon Domain (CNT‑1Å, 12 THz)
 
 **QPU Array (2048‑Qubit Topological Quantum Processor)**  
-Qubit Majorana fermion (nanowire InAs/Al) dengan koherensi suhu kamar (klaim 10 µs).  
-Menjalankan Quil‑Omega ISA, surface code error correction, dan distribusi Bell pair.
+Majorana fermion qubits (InAs/Al nanowire) with room‑temperature coherence (claimed 10 µs).  
+Runs Quil‑Omega ISA, surface code error correction, and Bell pair distribution.
 
 **Photonic NoC (PNOC)**  
-64‑router mesh fotonik dengan 64 kanal WDM → bisection bandwidth ~1 Pb/s.  
-Transport data antarmodul dan distribusi entanglement kuantum.
+64‑router photonic mesh with 64 WDM channels → bisection bandwidth ~1 Pb/s.  
+Inter‑module data transport and quantum entanglement distribution.
 
 **Neuromorphic Core (1M LIF Neurons)**  
-Array neuron Leaky Integrate‑and‑Fire dengan STDP dan reward‑modulated learning.  
-Terhubung ke antarmuka neural (bio‑electrode bus) dan NPU (Bridge 4).
+Leaky Integrate‑and‑Fire neuron array with STDP and reward‑modulated learning.  
+Connected to the neural interface (bio‑electrode bus) and NPU (Bridge 4).
 
 **DNA Computing Accelerator**  
-Simulator reaksi DNA strand displacement (DSD) super‑paralel: 10¹⁸ operasi/detik.  
-Komputasi Boolean masif, pattern matching, dan enkripsi berbasis DNA.
+Super‑parallel DNA strand displacement (DSD) reaction simulator: 10¹⁸ operations/second.  
+Massive Boolean computation, pattern matching, and DNA‑based encryption.
 
 **Optical NPU (1 EFLOPS MZI Tensor Core)**  
-Array Mach‑Zehnder interferometer 512×512 untuk perkalian matriks pada kecepatan cahaya.  
-1 EFLOPS dengan konsumsi daya ~2 Watt (klaim).
+512×512 Mach‑Zehnder interferometer array for matrix multiplication at the speed of light.  
+1 EFLOPS with ~2 Watt power consumption (claimed).
 
 **Memristive CRAM (512 GB Compute‑in‑Memory)**  
-Crossbar RRAM HfO₂ 1024×1024, Multiply‑Accumulate langsung di memori.  
-Memori kerja nol‑latensi untuk DNA, neuromorfik, dan AI.
+HfO₂ RRAM 1024×1024 crossbar, Multiply‑Accumulate directly in memory.  
+Zero‑latency working memory for DNA, neuromorphic, and AI workloads.
 
 **Zero‑Point Energy Harvester**  
-Pemanen energi dari fluktuasi vakum (efek Casimir dinamis), target 0.4 W.  
-Suplai daya latar untuk modul kuantum tanpa baterai eksternal.
+Energy harvester from vacuum fluctuations (dynamic Casimir effect), target 0.4 W.  
+Background power supply for quantum modules without external battery.
 
 **Self‑Heal Controller**  
-Pengontrol perbaikan substrat mandiri menggunakan liquid metal EGaIn.  
-Memantau resistansi jejak dan memicu aliran logam untuk perbaikan.
+Autonomous substrate repair controller using liquid metal EGaIn.  
+Monitors trace resistance and triggers metal flow for repair.
 
 **Omega CSM (Quantum‑Aware Safety Monitor)**  
-Mendeteksi pelanggaran bio‑interface, paradoks temporal, dekoherensi qubit, dan entropi kritis.  
-Beroperasi pada domain clock independen 1 GHz, mengeskalasi ke CSM klasik (Bridge 1).
+Detects bio‑interface violations, temporal paradoxes, qubit decoherence, and critical entropy.  
+Operates on an independent 1 GHz clock domain, escalates to the classical CSM (Bridge 1).
 
 ---
 
-## Analisis Realisme Teknologi
+## Technology Realism Analysis
 
-### ✅ Realistis (dapat direalisasikan dalam 5‑10 tahun)
+### ✅ Realistic (achievable within 5‑10 years)
 
-| Modul | Alasan |
-|-------|--------|
-| QDNA RISC‑V Cluster (16‑core) | Multi‑core RISC‑V sudah tersedia (SiFive, Ventana). |
-| QDNA NPU / GPU | NPU systolic & GPU diskrit sudah umum. |
-| QDNA 5G Modem | Modem 5G NR terintegrasi di SoC flagship. |
-| HBM3 / DDR5 / PCIe 6.0 | Produk komersial sepenuhnya. |
-| Classical CSM (ASIL‑D) | Monitor keselamatan fungsional dapat diimplementasikan dengan TMR. |
+| Module | Reason |
+|--------|--------|
+| QDNA RISC‑V Cluster (16‑core) | Multi‑core RISC‑V already available (SiFive, Ventana). |
+| QDNA NPU / GPU | Systolic NPU & discrete GPU already common. |
+| QDNA 5G Modem | 5G NR modem integrated in flagship SoCs. |
+| HBM3 / DDR5 / PCIe 6.0 | Fully commercial products. |
+| Classical CSM (ASIL‑D) | Functional safety monitor implementable with TMR. |
 
-### 🟡 Semi‑Realistis (riset aktif, komersial parsial mungkin dalam 10‑15 tahun)
+### 🟡 Semi‑Realistic (active research, partial commercialization possible within 10‑15 years)
 
-| Modul | Status 2026 |
-|-------|-------------|
-| Neuromorphic Core (1M LIF) | Prototipe seperti Loihi 2 ada, namun 1M neuron belum komersial. |
-| Memristive CRAM (512 GB) | RRAM crossbar untuk MAC sudah dalam test chip, belum skala 512 GB. |
-| Photonic NoC skala kecil | Silicon photonics interposer sedang dikembangkan, mesh 64‑router masih riset. |
-| PSP Spin‑Glass Solver | Ising solver berbasis SRAM sudah komersial (Fujitsu), skala 256×256 memungkinkan. |
-| CAIE | Akselerator probabilistic graphical model sedang dieksplorasi (analog‑AI). |
+| Module | Status 2026 |
+|--------|-------------|
+| Neuromorphic Core (1M LIF) | Prototypes like Loihi 2 exist, but 1M neurons not yet commercial. |
+| Memristive CRAM (512 GB) | RRAM crossbar for MAC already in test chips, not yet at 512 GB scale. |
+| Small‑scale Photonic NoC | Silicon photonics interposers in development, 64‑router mesh still research. |
+| PSP Spin‑Glass Solver | SRAM‑based Ising solver commercially available (Fujitsu), 256×256 scale feasible. |
+| CAIE | Probabilistic graphical model accelerators being explored (analog‑AI). |
 
-### 🔴 Futuristik Jauh (target >2051, perlu terobosan fundamental)
+### 🔴 Far Futuristic (target >2051, requires fundamental breakthroughs)
 
-| Modul | Tantangan |
-|-------|-----------|
-| QPU 2048‑qubit suhu kamar | Qubit koherensi suhu ruangan masih eksperimental; fault‑tolerant >1000 qubit logis butuh dekade. |
-| Optical NPU 1 EFLOPS @ 2 W | Perkalian matriks optik skala kecil terbukti, 1 EFLOPS presisi 8‑bit sangat spekulatif. |
-| DNA Computing Accel (pada chip) | Komputasi DNA eksis in vitro; implementasi solid‑state lookup table elektronik belum terbukti. |
-| Zero‑Point Energy Harvester | Daya makroskopis dari efek Casimir dinamis masih µW. |
-| Self‑Healing Liquid Metal | Polimer self‑healing ada, EGaIn untuk jejak nano‑IC masih konsep. |
-| Omega CSM deteksi paradoks temporal | Fiksi ilmiah; tidak ada mekanisme fisika yang dapat mendeteksi pelanggaran kausalitas. |
-| Bio‑interface harm monitor | Antarmuka neural eksperimental, deteksi "bahaya kesadaran" belum terdefinisi. |
-
----
-
-## Roadmap Pengembangan
-
-### Fase I – Fondasi Heterogen (2025‑2030)
-- RISC‑V multi‑core, NPU, GPU, modem 5G dalam satu die TSMC N3.
-- Memristive CRAM 2 GB sebagai last‑level cache eksperimental.
-- Prototipe PNOC 4‑router (silicon photonics interposer).
-- Neuromorphic core 100k neuron (CMOS saja).
-- CSM klasik ASIL‑D fungsional.
-- **Jembatan 1 & 2 diimplementasikan** (classical lockdown membekukan QPU virtual).
-
-### Fase II – Akselerator Fotonik & Kuantum Terbatas (2030‑2040)
-- Optical NPU 1 PFLOPS (MZI 512×512, presisi 4‑bit).
-- QPU 100‑qubit fisik dengan surface code terbatas, koherensi sub‑ruangan.
-- Photonic NoC 16‑router dengan wavelength routing.
-- CRAM 64 GB untuk sinapsis neuromorfik dan DNA complement lookup.
-- DNA computing accelerator solid‑state (FPGA + CRAM).
-- **Jembatan 3 & 4 diaktifkan** (pengukuran qubit → CAIE, spike neuromorfik → NPU).
-
-### Fase III – Unifikasi Penuh dengan Teknologi Radikal (2040‑2051+)
-- QPU 2048‑qubit dengan koherensi suhu kamar (Majorana nanowire + metamaterial shield).
-- Optical NPU 1 EFLOPS penuh.
-- Neuromorphic core 1M neuron, sinapsis RRAM, antarmuka neural lace.
-- DNA computing accel 10¹⁸ ops/detik (lookup table RRAM).
-- Zero‑point harvester tersertifikasi → suplai 0.4 W.
-- Self‑heal controller dengan EGaIn µ‑fluidic network.
-- Omega CSM dengan monitor consciousness risk, temporal paradox, dll.
-- **Semua 5 jembatan beroperasi penuh** – sistem Unified pertama.
+| Module | Challenge |
+|--------|-----------|
+| QPU 2048‑qubit room temperature | Room‑temperature qubit coherence still experimental; fault‑tolerant >1000 logical qubits needs decades. |
+| Optical NPU 1 EFLOPS @ 2 W | Small‑scale optical matrix multiplication proven, 1 EFLOPS at 8‑bit precision highly speculative. |
+| DNA Computing Accel (on chip) | DNA computing exists in vitro; solid‑state electronic lookup table implementation unproven. |
+| Zero‑Point Energy Harvester | Macroscopic power from dynamic Casimir effect still at µW level. |
+| Self‑Healing Liquid Metal | Self‑healing polymers exist, EGaIn for nano‑IC traces still conceptual. |
+| Omega CSM temporal paradox detection | Science fiction; no physical mechanism capable of detecting causality violations. |
+| Bio‑interface harm monitor | Neural interfaces experimental; detection of "consciousness harm" not yet defined. |
 
 ---
 
-## Estimasi Power Budget (Watt)
+## Development Roadmap
 
-| Modul                          | Fase I (2030) | Fase III (2051+) |
-|--------------------------------|---------------|------------------|
-| QDNA RISC‑V Cluster (16‑core)  | 15 W          | 8 W              |
-| QDNA NPU (incl. LM)            | 25 W          | 10 W             |
-| QDNA GPU (128 CUs)             | 50 W          | 30 W             |
-| QDNA 5G Modem                  | 3 W           | 1.5 W            |
-| PSP Spin‑Glass Solver          | 5 W           | 2 W              |
-| CAIE Engine                    | 2 W           | 1 W              |
-| Classical CSM (ASIL‑D)         | 0.5 W         | 0.5 W            |
-| HBM3 + DDR5 + PCIe PHY         | 30 W          | 20 W             |
-| **Total Klasik**               | **130.5 W**   | **73 W**         |
-| QPU Array (2048 qubit)         | –             | 8 W              |
-| Photonic NoC (64 router)       | –             | 0.5 W (+ 2 W laser eksternal) |
-| Neuromorphic Core (1M LIF)     | –             | 0.05 W           |
-| DNA Computing Accel            | –             | 1 W              |
-| Optical NPU (1 EFLOPS)         | –             | 2 W              |
-| Memristive CRAM (512 GB)       | –             | 0.5 W            |
-| Zero‑Point Harvester           | –             | **‑0.4 W** (penghasil) |
-| Self‑Heal Controller           | –             | 0.1 W            |
-| Omega CSM                      | –             | 0.2 W            |
-| **Total Post‑Silikon**         | –             | **11.35 W (netto)** |
-| **Total Platform**             | **130.5 W**   | **84.35 W**      |
+### Phase I – Heterogeneous Foundation (2025‑2030)
+- RISC‑V multi‑core, NPU, GPU, 5G modem on a single TSMC N3 die.
+- 2 GB Memristive CRAM as an experimental last‑level cache.
+- 4‑router PNOC prototype (silicon photonics interposer).
+- 100k neuron neuromorphic core (CMOS only).
+- Functional classical ASIL‑D CSM.
+- **Bridges 1 & 2 implemented** (classical lockdown freezes virtual QPU).
+
+### Phase II – Photonic & Limited Quantum Accelerators (2030‑2040)
+- 1 PFLOPS Optical NPU (512×512 MZI, 4‑bit precision).
+- Physical 100‑qubit QPU with limited surface code, sub‑room coherence.
+- 16‑router Photonic NoC with wavelength routing.
+- 64 GB CRAM for neuromorphic synapses and DNA complement lookup.
+- Solid‑state DNA computing accelerator (FPGA + CRAM).
+- **Bridges 3 & 4 activated** (qubit measurement → CAIE, neuromorphic spikes → NPU).
+
+### Phase III – Full Unification with Radical Technologies (2040‑2051+)
+- 2048‑qubit QPU with room‑temperature coherence (Majorana nanowire + metamaterial shield).
+- Full 1 EFLOPS Optical NPU.
+- 1M neuron neuromorphic core, RRAM synapses, neural lace interface.
+- DNA computing accel 10¹⁸ ops/second (RRAM lookup table).
+- Certified zero‑point harvester → 0.4 W supply.
+- Self‑heal controller with EGaIn µ‑fluidic network.
+- Omega CSM with consciousness risk monitor, temporal paradox, etc.
+- **All 5 bridges fully operational** – first Unified system.
 
 ---
 
-## Thermal Envelope & Pendinginan
+## Estimated Power Budget (Watts)
 
-- TDP maksimum Fase III: **85 W**.
-- Hot spot QPU: 8 W pada ~2 mm² → 400 W/cm² → direct‑die microfluidic / cryo‑microcooler (70 K).
-- Area dingin (neuromorphic, DNA, CRAM): operasi hingga 85°C, passive heat spreader.
-- Gradien termal: Klasik max 100°C, post‑silikon max 70°C → isolasi thermal gap.
-- Pendinginan 2‑fase dengan zona independen.
-- 1024 sensor suhu tertanam, pembacaan 1 kHz oleh CSM.
+| Module                          | Phase I (2030) | Phase III (2051+) |
+|---------------------------------|----------------|-------------------|
+| QDNA RISC‑V Cluster (16‑core)   | 15 W           | 8 W               |
+| QDNA NPU (incl. LM)             | 25 W           | 10 W              |
+| QDNA GPU (128 CUs)              | 50 W           | 30 W              |
+| QDNA 5G Modem                   | 3 W            | 1.5 W             |
+| PSP Spin‑Glass Solver           | 5 W            | 2 W               |
+| CAIE Engine                     | 2 W            | 1 W               |
+| Classical CSM (ASIL‑D)          | 0.5 W          | 0.5 W             |
+| HBM3 + DDR5 + PCIe PHY          | 30 W           | 20 W              |
+| **Classical Total**             | **130.5 W**    | **73 W**          |
+| QPU Array (2048 qubit)          | –              | 8 W               |
+| Photonic NoC (64 router)        | –              | 0.5 W (+ 2 W external laser) |
+| Neuromorphic Core (1M LIF)      | –              | 0.05 W            |
+| DNA Computing Accel             | –              | 1 W               |
+| Optical NPU (1 EFLOPS)          | –              | 2 W               |
+| Memristive CRAM (512 GB)        | –              | 0.5 W             |
+| Zero‑Point Harvester            | –              | **‑0.4 W** (generator) |
+| Self‑Heal Controller            | –              | 0.1 W             |
+| Omega CSM                       | –              | 0.2 W             |
+| **Post‑Silicon Total**          | –              | **11.35 W (net)** |
+| **Platform Total**              | **130.5 W**    | **84.35 W**       |
+
+---
+
+## Thermal Envelope & Cooling
+
+- Maximum TDP Phase III: **85 W**.
+- QPU hot spot: 8 W at ~2 mm² → 400 W/cm² → direct‑die microfluidic / cryo‑microcooler (70 K).
+- Cold areas (neuromorphic, DNA, CRAM): operation up to 85°C, passive heat spreader.
+- Thermal gradient: Classical max 100°C, post‑silicon max 70°C → thermal gap isolation.
+- 2‑phase cooling with independent zones.
+- 1024 embedded temperature sensors, 1 kHz readout by CSM.
 
 ---
 
 ## Packaging Strategy
 
-- **Platform:** TSMC CoWoS‑L, interposer silikon 100×100 mm², TSV pitch 15 µm.
+- **Platform:** TSMC CoWoS‑L, 100×100 mm² silicon interposer, 15 µm TSV pitch.
 - **Top die:**
-  - Chiplet Klasik (N3P) 20×20 mm².
-  - Chiplet Quantum Controller (CNT-1Å hybrid) 10×10 mm².
-  - Chiplet Photonic Engine (silicon photonics) 8×8 mm².
-  - Chiplet Neuromorphic+DNA 8×8 mm².
-- **3D Stacking:** Neuromorphic di atas CRAM (hybrid bonding), QPU di atas controller (indium bump).
-- **Benefit:** Bandwidth >100 TB/s antara CRAM dan neuromorphic, latensi sinapsis nol.
+  - Classical Chiplet (N3P) 20×20 mm².
+  - Quantum Controller Chiplet (CNT‑1Å hybrid) 10×10 mm².
+  - Photonic Engine Chiplet (silicon photonics) 8×8 mm².
+  - Neuromorphic+DNA Chiplet 8×8 mm².
+- **3D Stacking:** Neuromorphic on top of CRAM (hybrid bonding), QPU on top of controller (indium bump).
+- **Benefit:** >100 TB/s bandwidth between CRAM and neuromorphic, zero synapse latency.
 
 ---
 
 ## Software Stack
 
 ```
-Aplikasi (Python, C++, DSL)
+Application (Python, C++, DSL)
 ↓
 Omega Runtime (scheduler, memory mgr)
 ↓
@@ -282,60 +282,60 @@ Firmware & Hypervisor (seL4 on RISC‑V)
 Hardware
 ```
 
-- **Compiler:** QCC mempartisi program, memetakan qubit, menjadwalkan error correction, dan menghasilkan kode Quil‑Omega + LLVM/TVM.
-- **Runtime:** Omega Scheduler mengelola job queue dengan prioritas CSM, alokasi qubit, dan sinkronisasi Bridge 3/4.
+- **Compiler:** QCC partitions programs, maps qubits, schedules error correction, and generates Quil‑Omega + LLVM/TVM code.
+- **Runtime:** Omega Scheduler manages job queues with CSM priority, qubit allocation, and Bridge 3/4 synchronization.
 
 ---
 
-## Fault Model & Mitigasi
+## Fault Model & Mitigation
 
-| Jenis Fault            | Deteksi                     | Mitigasi |
-|------------------------|-----------------------------|----------|
-| Hard fault (stuck‑at)  | MBIST, ECC, endurance cnt  | Self‑heal EGaIn, ganti kolom CRAM |
-| Decoherence burst      | Omega CSM coherence_map    | QPU freeze, reinisialisasi, repeat |
+| Fault Type             | Detection                   | Mitigation |
+|------------------------|-----------------------------|------------|
+| Hard fault (stuck‑at)  | MBIST, ECC, endurance cnt  | Self‑heal EGaIn, replace CRAM column |
+| Decoherence burst      | Omega CSM coherence_map    | QPU freeze, reinitialize, repeat |
 | Photon loss/skew       | Eye monitor, BER counter    | Re‑route λ, retransmit, heater tune |
-| Synaptic drift         | STDP, reward validasi       | Tulis ulang bobot, plasticity adaptif |
-| Timing violation       | Dual‑lockstep, TMR          | Flush pipeline, tegangan CSM |
-| Thermal runaway        | 1024 sensor termal          | System lockdown, zona panas mati |
+| Synaptic drift         | STDP, reward validation     | Rewrite weights, adaptive plasticity |
+| Timing violation       | Dual‑lockstep, TMR          | Flush pipeline, CSM voltage |
+| Thermal runaway        | 1024 thermal sensors        | System lockdown, hot zone shutdown |
 | Temporal paradox       | Omega CSM temporal_consistent | QPU freeze, clock gating, reset |
-| Adversarial attack     | Uncertainty monitor         | Batal inferensi, muat model terpercaya |
+| Adversarial attack     | Uncertainty monitor         | Abort inference, load trusted model |
 
 ---
 
 ## Security Model (Zero‑Trust Heterogeneous Security)
 
-- **Domain Klasik:** TEE dengan PMP/IOPMP, Secure Boot, IOMMU untuk NPU/GPU.
-- **Domain Kuantum:** Instruksi terenkripsi via CAIE, QKD internal untuk Bell pair, tanpa akses bus langsung.
-- **Domain Bio:** Analog firewall, enkripsi spike‑train, otorisasi Omega CSM.
-- **PQC:** CRYSTALS‑Kyber (enkapsulasi), SPHINCS+ (tanda tangan).
-- **CSM sebagai Enforcer:** Policy engine, pembaruan via constitutional plasticity dengan konsensus TMR + creator auth.
+- **Classical Domain:** TEE with PMP/IOPMP, Secure Boot, IOMMU for NPU/GPU.
+- **Quantum Domain:** Instructions encrypted via CAIE, internal QKD for Bell pairs, no direct bus access.
+- **Bio Domain:** Analog firewall, spike‑train encryption, Omega CSM authorization.
+- **PQC:** CRYSTALS‑Kyber (encapsulation), SPHINCS+ (signature).
+- **CSM as Enforcer:** Policy engine, updates via constitutional plasticity with TMR consensus + creator auth.
 
 ---
 
 ## Scheduler Hierarchy
 
-1. **Global Strategic Scheduler (CSM‑driven)** – Mode misi kritis/oportunistik, batasan konstitusi.
-2. **Domain‑Level Scheduler (Runtime)** – Alokasi qubit/NPU slice/cluster, prioritas memori.
+1. **Global Strategic Scheduler (CSM‑driven)** – Mission‑critical/opportunistic mode, constitutional constraints.
+2. **Domain‑Level Scheduler (Runtime)** – Qubit/NPU slice/cluster allocation, memory priority.
 3. **Low‑Level Hardware Sequencer** – QPU Gate FSM, PNOC TDM, AER arbiter, DNA sequencer.
 
 ---
 
 ## Manufacturing Dependency
 
-| Komponen               | Teknologi Fab        | Pemasok 2025          | Kesiapan           |
+| Component              | Fab Technology       | Supplier 2025         | Readiness          |
 |------------------------|----------------------|-----------------------|--------------------|
-| CMOS SoC (N3P)         | TSMC N3P FinFET      | TSMC                  | Komersial          |
-| HBM3 Stacks            | DRAM 10nm            | Samsung / SK hynix    | Komersial          |
-| Silicon Interposer     | CoWoS‑L              | TSMC                  | Komersial          |
-| Memristive CRAM        | RRAM 28nm BEOL       | TSMC / IHP / Panasonic| Riset → produksi   |
-| Qubit Majorana         | InAs/Al MBE + CNT    | Microsoft / TU Delft  | Riset fundamental  |
-| Silicon Photonics      | 45nm SOI             | GF / AIM              | Prototipe          |
-| CNT Transistor         | CNT inkjet+annealing | MIT / Stanford / TSMC | Riset → awal       |
-| Liquid Metal Self‑Heal | EGaIn microfluidic   | N/A                   | Konsep lab         |
-| Zero‑Point Harvester   | MEMS Casimir cavity  | N/A                   | Spekulatif         |
+| CMOS SoC (N3P)         | TSMC N3P FinFET      | TSMC                  | Commercial         |
+| HBM3 Stacks            | DRAM 10nm            | Samsung / SK hynix    | Commercial         |
+| Silicon Interposer     | CoWoS‑L              | TSMC                  | Commercial         |
+| Memristive CRAM        | RRAM 28nm BEOL       | TSMC / IHP / Panasonic| Research → production |
+| Majorana Qubit         | InAs/Al MBE + CNT    | Microsoft / TU Delft  | Fundamental research |
+| Silicon Photonics      | 45nm SOI             | GF / AIM              | Prototype          |
+| CNT Transistor         | CNT inkjet+annealing | MIT / Stanford / TSMC | Research → early   |
+| Liquid Metal Self‑Heal | EGaIn microfluidic   | N/A                   | Lab concept        |
+| Zero‑Point Harvester   | MEMS Casimir cavity  | N/A                   | Speculative        |
 
 ---
 
-## Penutup
+## Closing
 
-Cognisys‑QDNA Omega Unified adalah visi arsitektur yang memadukan komponen realistis jangka pendek dengan aspirasi jangka panjang. Implementasi bertahap memungkinkan validasi bertingkat sambil terus mendorong batas fisik komputasi. Dokumen ini berfungsi sebagai cetak biru awal bagi tim rekayasa, investor, dan mitra riset yang ingin mewujudkan era post‑silicon heterogeneous computing.
+Cognisys‑QDNA Omega Unified is an architectural vision that blends near‑term realistic components with long‑term aspirations. Phased implementation enables layered validation while continuously pushing the physical boundaries of computation. This document serves as an initial blueprint for engineering teams, investors, and research partners who wish to realize the era of post‑silicon heterogeneous computing.
